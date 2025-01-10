@@ -1,0 +1,388 @@
+---
+title: "Exploring Multi-type Branching Processes"
+subtitle: "Recapitulating the results of Antia 2003"
+format: pdf
+execute:
+  echo: false
+  warning: false
+bibliography: ../../assets/bibFiles/dataanalysis-references.bib
+csl: ../../assets/bibFiles/apa.csl
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+
+
+```
+
+# Objective
+
+We are interested in exploring the probability of emergence of zoonotic virus in a population immune to a cross-reactive relative of the virus, particularly as the portion of the population immune decreases over time. As chains of human-human transmission increase, the the zoonotic virus faces selective pressure and opportunity to evolve a higher $R_0$ in its new host. 
+
+These ideas were initially explored in @AntiaNature2003, wherein the probability of disease emergence as a function of 1) mutation rate, 2) number of mutations required for specialization to the new host, and 3) fitness of intermediate mutations, were modeled using a muti-type branching process framework. 
+
+The goal of this document is to develop and plot the same models present in @AntiaNature2003.
+
+# Multi-type branching processes 
+
+# Models
+
+```{r one-mutation}
+#single mutation required for evolution 
+## parameters
+mus = c(10^-1, 10^-2, 10^-3, 10^-4) # mutation rate
+R0s = seq(0,1,0.01) # R0 is independent variable
+
+#dataframe to store deterministic approximation values
+df = data.frame(R0 = R0s)
+
+#evaluate approximation equation for each mu at various R0s
+for(i in 1:length(mus)){
+  mu = mus[i] #set mu
+  newcol = mu*R0s/(1-R0s) #evaluate approximation for each R0
+  
+  df = cbind(df, newcol) %>% as.data.frame() #add to dataframe
+}
+
+#format for plotting
+colnames(df) = c("R0", as.character(mus))
+df = pivot_longer(data = df,#pivot to long form
+  cols = !R0,
+  names_to = "mu",
+  values_to = "Prob.Emergence"
+)
+
+#plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue")
+## plot with ggplot
+ggplot() + geom_line(data = df, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
+  scale_y_continuous(trans= "log10") +
+  theme_bw() +
+  scale_color_manual(values = my.colors)
+
+```
+
+The approximation for the single-mutation nearly matches the numerical simulation from figure 1a of @AntiaNature2003. However, these approximations break down as $\mu$ approaches 1 or $R_0$ approaches 1. We would thus like to solve for the probability of emergence numerically with the probability generating functions of the branching processes. 
+
+
+```{r fixed-point-equations}
+## Define fixed point equations
+# pgfs - qi
+fpeq_1 = function(q1,q2) {exp(-(1-mu)*R0_1*(1-q1))*exp(-mu*R0_1*(1-q2)) - q1}
+fpeq_2 = function(q1,q2) {exp(-R0_2*(1-q2)) - q2}
+
+# function for prob.emergence
+prob_emergence = function(qs,init) {1 - (qs[1]^init[1]*qs[2]^init[2])} #we could vectorize this for qs longer than 
+
+## define params
+mu = 10^-3
+R0_1 = 0.5
+R0_2 = 1000
+
+# define initial conditions 
+start = c(1,0) #start with 1 wild type and no evolved
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(2)
+y[1] <- fpeq_1(x[1], x[2])
+y[2] <- fpeq_2(x[1], x[2])
+y
+}
+
+# initial guess
+xstart = c(0.5, 0.5)
+fstart = single_mut(xstart)
+
+# newton start
+qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+prob.emergence = prob_emergence(qs = qs, init = start)
+
+# we should get a probability of 10^-3 
+formatC(prob.emergence, format = "e", digits = 1) # heck yeah!
+
+```
+
+BOOYA 
+
+
+# Figure 1a
+
+```{r figure-1a}
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.2 # final R0_2
+mus = c(10^-1, 10^-2, 10^-3, 10^-4) # mus to test 
+
+# define initial conditions 
+start = c(1,0) #start with 1 wild type and no evolved
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(mus))
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(2)
+y[1] <- fpeq_1(x[1], x[2])
+y[2] <- fpeq_2(x[1], x[2])
+y
+}
+
+# initial guess
+xstart = c(0.9, 0.1)
+fstart = single_mut(xstart)
+
+for(j in 1:length(mus)){
+  #set mu
+  mu = mus[j] 
+  for(i in 1:length(R0_1s)){
+   # set R0_1
+    R0_1 = R0_1s[i]
+   # newton start
+    qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+   # solve for prob.emergence
+    prob.emergence = prob_emergence(qs = qs, init = start) 
+   # add solution to matrix
+    probs.emergence[i,j] = prob.emergence
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", as.character(formatC(mus, format = "e", digits = 1))) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "mu",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10") +
+  scale_color_manual(values = my.colors)
+
+  
+
+```
+
+# Figure 3a
+
+```{r multi-mutation-model}
+## Define fixed point equations
+# pgfs - qi
+fpeq_1 = function(q1,q2,q3,q4) {exp(-(1-mu)*R0_1*(1-q1))*exp(-mu*R0_1*(1-q2)) - q1}
+fpeq_2 = function(q1,q2,q3,q4) {exp(-(1-mu)*R0_1*(1-q2))*exp(-mu*R0_1*(1-q3)) - q2}
+fpeq_3 = function(q1,q2,q3,q4) {exp(-(1-mu)*R0_1*(1-q3))*exp(-mu*R0_1*(1-q4)) - q3}
+fpeq_4 = function(q1,q2,q3,q4) {exp(-R0_2*(1-q4)) - q4}
+
+# function for prob.emergence
+prob_emergence = function(qs,init) {1 - qs[1]^init[1]*qs[2]^init[2]*qs[3]^init[3]*qs[4]^init[4]} #we could vectorize this for qs longer than 
+
+## define params
+mu = 10^-1
+R0_1 = 0.5
+R0_2 = 1.2
+
+# define initial conditions 
+start = c(1,0,0,0) #start with 1 wild type and no evolved
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(4)
+y[1] <- fpeq_1(x[1], x[2], x[3], x[4])
+y[2] <- fpeq_2(x[1], x[2], x[3], x[4])
+y[3] <- fpeq_3(x[1], x[2], x[3], x[4])
+y[4] <- fpeq_3(x[1], x[2], x[3], x[4])
+y
+}
+
+# initial guess
+xstart = c(0.9, 0.05, 0.05, 0)
+fstart = single_mut(xstart)
+
+# newton start
+qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+prob.emergence = prob_emergence(qs = qs, init = start)
+
+# we should get a probability of 10^-3 
+formatC(prob.emergence, format = "e", digits = 1) # heck yeah!
+
+
+```
+
+```{r test-figure-3a}
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.2 # final R0_2
+mus = c(10^-1) # mus to test 
+
+# define initial conditions 
+start = c(1,0,0,0) #start with 1 wild type and no evolved
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(mus))
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(4)
+y[1] <- fpeq_1(x[1], x[2], x[3], x[4])
+y[2] <- fpeq_2(x[1], x[2], x[3], x[4])
+y[3] <- fpeq_3(x[1], x[2], x[3], x[4])
+y[4] <- fpeq_4(x[1], x[2], x[3], x[4])
+y
+}
+
+# initial guess
+xstart = c(1, 0, 0, 0)
+fstart = single_mut(xstart)
+
+for(j in 1:length(mus)){
+  #set mu
+  mu = mus[j] 
+  for(i in 1:length(R0_1s)){
+   # set R0_1
+    R0_1 = R0_1s[i]
+   # newton start
+    qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+   # solve for prob.emergence
+    prob.emergence = prob_emergence(qs = qs, init = start) 
+   # add solution to matrix
+    probs.emergence[i,j] = prob.emergence
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", as.character(formatC(mus, format = "e", digits = 1))) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "mu",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10") +
+  geom_hline(yintercept = 0.1) + 
+  geom_hline(yintercept = 0.001) +
+  geom_hline(yintercept = 10^-5) +
+  scale_color_manual(values = my.colors)
+
+  
+
+```
+
+Let's see whether we can vectorize this...
+
+```{r figure-3a}
+#### Jackpot model
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.2 # final R0_2
+mu = 10^-1 #how many intermediate steps?
+ms = 2:6 #0:4 in paper
+
+# function for prob.emergence
+prob_emergence = function(qs,init) {1 - prod(qs^init)}
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms))
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(m)
+for(i in 1:(m-1)){
+  y[i] = exp(-(1-mu)*R0_1*(1-x[i]))*exp(-mu*R0_1*(1-x[i+1])) - x[i]
+}
+  y[ms[j]] = exp(-R0_2*(1-x[m])) - x[m]
+  y
+}
+
+#run simulation for each number of mutations
+for(j in 1:length(ms)){
+  #set m
+  m = ms[j] 
+  # initial guess
+  xstart = c(1, rep(0, (ms[j]-1)))
+  fstart = single_mut(xstart)
+  #set init
+  init = c(1, rep(0, ms[j]-1))
+  for(i in 1:length(R0_1s)){
+   # set R0_1
+    R0_1 = R0_1s[i]
+   # newton start
+    qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+   # solve for prob.emergence
+    prob.emergence = prob_emergence(qs = qs, init = init) 
+   # add solution to matrix
+    probs.emergence[i,j] = prob.emergence
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", paste0(ms, "types")) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "m",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue", "orange")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = m, col = m)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10", limits = c(10^-5.3, 1)) +
+  scale_color_manual(values = my.colors)
+
+
+```
+
+Note: complete the jackpot model, fitness valley model, and additive models.
+
+# Waiting times to extinction
+
+```{r waiting-times}
+
+
+
+```
+
+
+
+# References
