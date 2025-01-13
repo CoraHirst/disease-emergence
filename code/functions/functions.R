@@ -1,5 +1,4 @@
 ### single-mutation probability of extinction function 
-
 pEmergence_single = function(mu, R0_1, R0_2, xstart, init){
   ### ## Define fixed point equations
   # pgfs - qi
@@ -37,13 +36,115 @@ pEmergence_single = function(mu, R0_1, R0_2, xstart, init){
   return(prob.emergence)
 }
 
+###### Multiple mutations required
+#### jackpot model
+pEmergence_jackpot = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  ## parms 
+  R0_1 = R0_1 #R0_1 of initial wildtype
+  R0_2 = R0_2 #final adapted type R0_2
+  mu = mu #mutation rate (same for each type)
+  m = m #number of types here, number of intermediates in paper
+  init = init #vector initial numbers of infections of each type
+  xstart = xstart #vector of initial guesses (between 0 and 1) for fixed point solution
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0_1)*(1-x[i]))*exp(-mu*R0_1*(1-x[i+1])) - x[i]
+    }
+    y[ms[j]] = exp(-R0_2*(1-x[m])) - x[m]
+    y
+  }
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+  return(prob.emergence)
+}
+
+###### Multiple mutations required
+#### additive model
+pEmergence_additive_paper = function(mu, R0_1, R0_2, Rstep, xstart, init){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  ## parms 
+  R0_1 = R0_1 #R0_1 of initial wildtype
+  R0_2 = R0_2 #final adapted type R0_2
+  R0_int = (R0_1+R0_2)/2 #intermediate R0
+  mu = mu #mutation rate (same for each type)
+
+  init = init #vector initial numbers of infections of each type
+  xstart = xstart #vector of initial guesses (between 0 and 1) for fixed point solution
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    y[1] = exp(-(1-mu)*R0_1*(1-x[1]))*exp(-mu*R0_1*(1-x[2])) - x[1]
+    y[2] = exp(-(1-mu)*R0_int*(1-x[2]))*exp(-mu*R0_int*(1-x[3])) - x[2]
+    y[3] = exp(-R0_2*(1-x[3])) - x[3]
+    y
+  }
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+  return(prob.emergence)
+}
+
+
+###### Multiple mutations required
+#### additive model
+pEmergence_additive = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  ## parms 
+  R0_1 = R0_1 #R0_1 of initial wildtype
+  R0_2 = R0_2 #final adapted type R0_2
+  mu = mu #mutation rate (same for each type)
+  m = m #number of types here, number of intermediates in paper
+  Rstep = (R0_2-R0_1)/(m-1) # increase in R0 with each step
+  init = init #vector initial numbers of infections of each type
+  xstart = xstart #vector of initial guesses (between 0 and 1) for fixed point solution
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0_1+Rstep*(1-i))*(1-x[i]))*exp(-mu*(R0_1+Rstep*(1-i))*(1-x[i+1])) - x[i]
+    }
+    y[ms[j]] = exp(-R0_2*(1-x[m])) - x[m]
+    y
+  }
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+  return(prob.emergence)
+}
 
 
 #################### additive model ######################
 ### multiple-mutation probability of extinction function with additive R0
 
-pEmergence_additive = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
-   
+pEmergence_additive_fixedstep = function(m, mu, R0_1, R0_2, Rstep, xstart, init){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  
   ### define system of nl equations
   single_mut <- function(x) {
     y <- numeric(m) #vector to store fixed points
@@ -78,3 +179,5 @@ pEmergence_additive = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of
   
   return(prob.emergence)
 }
+
+

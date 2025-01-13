@@ -1,0 +1,245 @@
+---
+title: "Vaccination Efficacy for Zoonoses with Varying Spillover $R_0$"
+subtitle: "Recapitulating the results of Antia 2003"
+format: pdf
+execute:
+  echo: false
+  warning: false
+bibliography: ../../../assets/bibFiles/dataanalysis-references.bib
+csl: ../../../assets/bibFiles/apa.csl
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+library(gridExtra) #for arrangeing plots
+source(here("code", "functions", "functions.R"))
+
+```
+
+# Objective
+
+The goal of this document is to develop a multi-type branching process model to investigate the impact of vaccination on the probability of emergence of emergence of a zoonotic disease in a population.
+
+In this document, we will consider the case of multi-step pathogen evolution, where a wild-type variant is multiple mutations away from evolving an $R_0 >= 1$ in humans to achieve sustained human-human transmission.
+
+# Model outline
+
+We base the following on a model presented in @AntiaNature2003, which predicts the probability of disease emergence for Zoonotic variants as a function of their abilities to transmit after spillover (inital $R_0$), rates of of mutation, and mutational distance (number of mutations) from an $R_0 >= 1$.
+
+Predictions are made by calculating the extinction probabilities of chains of transmission initiated by a spillover variant using a multi-type branching process framework. Each "type" within the branching process model represents an infection with a variant of a certain number of mutations - thus `m` types represent `m` types of variants, from wild-type to human evolved. In this document, variant transmission grows increasingly better with each added mutation at a fixed increase per mutation, and thus follows the "additive model" described in @AntiaNature2003.
+
+We plot the relationship between the probability of emergence and the initial R0 of the wild-type variant as a function of the number of mutations required for adaptation below: 
+
+
+```{r additive}
+#### additive model
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.5 # final R0_2
+mus = c(10^-1, 10^-3) #how many intermediate steps?
+m = 3 #1 in paper; number of types here, number of intermediates in paper
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(mus))
+
+#run simulation for each number of mutations
+for(j in 1:length(mus)){
+  #set mu 
+  mu = mus[j] 
+  # initial guess
+  xstart = c(0.9, 0.05, 0.05)
+  #set init
+  init = c(1, 0, 0)
+  for(i in 1:length(R0_1s)){
+   # set variable parms
+    R0_1 = R0_1s[i] # set wild type R0
+   # add solution to matrix
+    probs.emergence[i,j] = pEmergence_additive_paper(mu=mu, R0_1=R0_1, R0_2=R0_2, xstart=xstart, init=init)
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", paste0(mus, "rate")) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "mu",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue", "orange")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10", limits = c(10^-8, 1)) + scale_x_continuous(limits = c(0,1)) +
+  scale_color_manual(values = my.colors)
+
+
+
+```
+
+```{r additive-model}
+#### additive model
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.5 # final R0_2
+mu = 10^-3 #how many intermediate steps?
+ms = 3 #0:4 in paper; number of types here, number of intermediates in paper
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms))
+
+
+#run simulation for each number of mutations
+for(j in 1:length(ms)){
+  #set m 
+  m = ms[j] 
+  # initial guess
+  xstart = c(1, rep(0, (ms[j]-1)))
+  #set init
+  init = c(1, rep(0, ms[j]-1))
+  for(i in 1:length(R0_1s)){
+   # set variable parms
+    R0_1 = R0_1s[i] # set wild type R0
+   # add solution to matrix
+    probs.emergence[i,j] = pEmergence_additive(m=m, mu=mu, R0_1=R0_1, R0_2=R0_2, xstart=xstart, init=init)
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", paste0(ms, "types")) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "m",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue", "orange")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = m, col = m)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10", limits = c(10^-8, 1)) +
+  scale_color_manual(values = my.colors)
+
+
+```
+
+For a better understanding of this model, please refer to `code/exploratory/AntiaNat2003_models.qmd`.
+
+# Effect of population immunity on emergence probability
+
+We adapt the above model to observe how the probability of emergence changes as a function of the fraction of the population immune to infection. We refer to this change in probability as $\Delta P_{emergence}$.
+
+We first assume that vaccination provides complete immunity, such that 25% vaccinated means a variant is 25% less likely to infect and generate offspring cases as it would be in the unvaccinated population. Ultimately:
+
+$$
+\Delta P_{emergence} = P_{emergence}(R_{0,WT}) - P_{emergence}((1-f_v)R_{0,WT}),
+$$
+
+where $R_{0,WT}$ is the R_0 of the spillover variant in an unvaccinated population and $f_v$ is the fraction of the population vaccinated. Note, however, that the curve used to calculate $P_{emergence}$ is dependent upon the number of mutations still needed to gain human-human transmission - ultimately, dependent upon the initial $R_0$ (generate figure.)
+
+In the code chunk below, we show the dependence of the probability of emergence on the number of mutations required:
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r additive-model}
+##### set parameters
+m = 6 #set m: number of types #5 mutations required
+R0_1s = seq(0,1.2, by = 0.1) #R1s to test
+R0_2 = 1.2 #final adapted type R0
+mu = 10^-4 #mutation rate
+f_vs = seq(0,1, by = 0.1) # fractions to test
+Rstep = R0_2/(m-1) # increase in R0 with each step
+breaks = c(0, Rstep*(1:(m-1))) #defines breaks for the ranges of R0 relevent for each variant, m-something mutations away from adaptation
+
+# storage matrix 
+delta.p = matrix(nrow = length(R0_1s), ncol = length(f_vs))
+
+# calculate delta ps
+for(i in 1:length(R0_1s)){
+  for(j in 1:length(f_vs)){
+  # set variable parms
+    wtR0_1 = R0_1s[i] #set R0 of wild type
+    fv = f_vs[j] #set portion of population vaccinated
+    fvR0_1 = (1-fv)*wtR0_1 #set wt R0 in vaccinated population 
+  # set curves
+    # wild type w/o vaccination
+    wtR0_diffs = breaks - wtR0_1
+    wtMutations = m - (which.min(wtR0_diffs[wtR0_diffs >= 0])-1) #how many mutations away is the wtR0?
+    # wild type w/ vaccination
+    fvR0_diffs = breaks - fvR0_1
+    fvMutations = m - (which.min(fvR0_diffs[fvR0_diffs >= 0])-1) #how many mutations away is the wtR0?
+  ## wild-type probability
+    pWT = pEmergence_additive(m = wtMutations, mu = mu, R0_1 = wtR0_1, R0_2 = R0_2, init = c(1, rep(0, (wtMutations-1))), xstart = c(1, rep(0, (wtMutations-1))), Rstep = Rstep) #note init and x start lengths depend on which #muts curve the r0 lands on
+  ## in vaccinated population 
+    pFV = pEmergence_additive(m = fvMutations, mu = mu, R0_1 = fvR0_1, R0_2 = R0_2, init = c(1, rep(0, (fvMutations-1))), xstart = c(1, rep(0, (fvMutations-1))), Rstep = Rstep) #note init and x start lengths depend on which #muts curve the r0 lands on
+   # add solution to matrix
+    delta.p[i,j] = 
+    
+    
+    print(pFV)
+    print(pWT)
+  }
+}
+
+#format delta.p dataframe
+delta.p = cbind(R0_1s, delta.p) %>% as.data.frame() #dataframe with R0s column
+colnames(delta.p) = c("R0", f_vs) #column names for referencing
+```
+
+
+
+
+
+```{r plot-deltaP}
+#long-form 
+delta.p.long = delta.p %>%
+  pivot_longer(
+    cols = !R0, 
+    names_to = "frac_Vax",
+    values_to = "DeltaP"
+  )
+
+# plot heatmap 
+ggplot() + 
+  geom_tile(data = delta.p.long, aes(x = R0, y = frac_Vax, fill = (DeltaP))) + 
+  scale_y_discrete(breaks = c(0.25, 0.5, 0.75, 1))
+
+```
+
+
+

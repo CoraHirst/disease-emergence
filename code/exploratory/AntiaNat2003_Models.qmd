@@ -16,7 +16,7 @@ library(here) #for easy local path referencing
 library(tidyverse) #for easy manipulation of data structures
 library(nleqslv) #for solving nonlinear systems of equations
 
-
+source(here("code", "functions", "functions.R"))
 ```
 
 # Objective
@@ -373,6 +373,7 @@ ggplot() +
 
 ```
 
+
 Note: complete the jackpot model, fitness valley model, and additive models.
 
 
@@ -381,7 +382,7 @@ Note: complete the jackpot model, fitness valley model, and additive models.
 ## parms 
 R0_1s = seq(0,1.2, by = 0.01) #R1s to test
 R0_2 = 1.2 # final R0_2
-mu = 10^-1 #how many intermediate steps?
+mu = 10^-3 #how many intermediate steps?
 ms = 2:6 #0:4 in paper; number of types here, number of intermediates in paper
 
 # function for prob.emergence
@@ -442,7 +443,7 @@ ggplot() +
   geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = m, col = m)) +
   theme_bw() +
   labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
-  scale_y_continuous(trans = "log10", limits = c(10^-5.3, 1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) +
   scale_color_manual(values = my.colors)
 
 

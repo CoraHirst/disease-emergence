@@ -127,7 +127,7 @@ ggplot() +
 # finish later blech
 ```
 
-```{r heatmap-mu101}
+```{r deltaP-fv-single}
 # parameters
 mu = 10^-1 #mutation rate
 R0_1s = seq(0,1.2, by = 0.01) #R1s to test
@@ -160,7 +160,7 @@ for(i in 1:length(R0_1s)){
 ```
 
 
-```{r plot-deltaP-mu101}
+```{r plot-deltaP}
 #format delta.p dataframe
 delta.p = cbind(R0_1s, delta.p) %>% as.data.frame() #dataframe with R0s column
 colnames(delta.p) = c("R0", f_vs) #column names for referencing
@@ -180,7 +180,7 @@ ggplot() +
 
 ```
 
-Below, we plot how the aboe heat map for various mutation rates: 
+Below, we plot how the above heat map for various mutation rates: 
 
 ```{r vary-mu}
 # parameters
@@ -215,7 +215,7 @@ for(i in 1:length(R0_1s)){
 ```
 
 
-```{r plot-deltaP-mu101}
+```{r plot-deltaP-varyMu}
 # parameters
 mus = c(10^-1, 10^-2, 10^-3, 10^-4) #mutation rate
 R0_1s = seq(0,1.2, by = 0.01) #R1s to test
