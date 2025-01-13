@@ -375,6 +375,80 @@ ggplot() +
 
 Note: complete the jackpot model, fitness valley model, and additive models.
 
+
+```{r additive-model}
+#### additive model
+## parms 
+R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_2 = 1.2 # final R0_2
+mu = 10^-1 #how many intermediate steps?
+ms = 2:6 #0:4 in paper; number of types here, number of intermediates in paper
+
+# function for prob.emergence
+prob_emergence = function(qs,init) {1 - prod(qs^init)}
+
+#empty vector to store probs
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms))
+
+## solve system of equations
+# define system of nl equations
+single_mut <- function(x) {
+y <- numeric(m)
+for(i in 1:(m-1)){
+  y[i] = exp(-(1-mu)*(R0_1+Rstep*(1-i))*(1-x[i]))*exp(-mu*R0_1*(1-x[i+1])) - x[i]
+}
+  y[ms[j]] = exp(-R0_2*(1-x[m])) - x[m]
+  y
+}
+
+#run simulation for each number of mutations
+for(j in 1:length(ms)){
+  #set m 
+  m = ms[j] 
+  # initial guess
+  xstart = c(1, rep(0, (ms[j]-1)))
+  #set init
+  init = c(1, rep(0, ms[j]-1))
+  for(i in 1:length(R0_1s)){
+   # set variable parms
+    R0_1 = R0_1s[i] # set wild type R0
+    Rstep = (R0_2-R0_1)/(m-1) # increase in R0 with each step
+   # newton start
+    qs = nleqslv(xstart, single_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+   # solve for prob.emergence
+    prob.emergence = prob_emergence(qs = qs, init = init) 
+   # add solution to matrix
+    probs.emergence[i,j] = prob.emergence
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", paste0(ms, "types")) # add mu to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>%
+ pivot_longer(cols = !R0,
+  names_to = "m",
+  values_to = "Prob.Emergence"
+)
+
+# Plot
+## colors for plotting
+my.colors = c("black", "red", "green", "blue", "orange")
+## plot
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = m, col = m)) +
+  theme_bw() +
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
+  scale_y_continuous(trans = "log10", limits = c(10^-5.3, 1)) +
+  scale_color_manual(values = my.colors)
+
+
+```
+
+
 # Waiting times to extinction
 
 ```{r waiting-times}
