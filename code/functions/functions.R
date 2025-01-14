@@ -125,9 +125,9 @@ pEmergence_additive = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of
   multi_mut <- function(x) {
     y <- numeric(m)
     for(i in 1:(m-1)){
-      y[i] = exp(-(1-mu)*(R0_1+Rstep*(1-i))*(1-x[i]))*exp(-mu*(R0_1+Rstep*(1-i))*(1-x[i+1])) - x[i]
+      y[i] = exp(-(1-mu)*(R0_1+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R0_1+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
     }
-    y[ms[j]] = exp(-R0_2*(1-x[m])) - x[m]
+    y[m] = exp(-R0_2*(1-x[m])) - x[m]
     y
   }
   

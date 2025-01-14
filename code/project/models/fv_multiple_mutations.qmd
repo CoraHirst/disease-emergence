@@ -51,7 +51,7 @@ for(j in 1:length(mus)){
   #set mu 
   mu = mus[j] 
   # initial guess
-  xstart = c(0.9, 0.05, 0.05)
+  xstart = c(1, 0, 0)
   #set init
   init = c(1, 0, 0)
   for(i in 1:length(R0_1s)){
@@ -82,7 +82,7 @@ ggplot() +
   geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
   theme_bw() +
   labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
-  scale_y_continuous(trans = "log10", limits = c(10^-8, 1)) + scale_x_continuous(limits = c(0,1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) + scale_x_continuous(limits = c(0,1)) +
   scale_color_manual(values = my.colors)
 
 
@@ -94,25 +94,24 @@ ggplot() +
 ## parms 
 R0_1s = seq(0,1.2, by = 0.01) #R1s to test
 R0_2 = 1.5 # final R0_2
-mu = 10^-3 #how many intermediate steps?
-ms = 3 #0:4 in paper; number of types here, number of intermediates in paper
+mus = c(10^-1, 10^-3) #how many intermediate steps?
+m = 3 #0:4 in paper; number of types here, number of intermediates in paper
 
 #empty vector to store probs
-probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms))
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(mus))
+# initial guess
+xstart = c(1, rep(0, (m-1)))
+#set init
+init = c(1, rep(0, m-1))
 
-
-#run simulation for each number of mutations
-for(j in 1:length(ms)){
-  #set m 
-  m = ms[j] 
-  # initial guess
-  xstart = c(1, rep(0, (ms[j]-1)))
-  #set init
-  init = c(1, rep(0, ms[j]-1))
+#populate matrix
+for(j in 1:length(mus)){
+  # set mu
+  mu = mus[j]
   for(i in 1:length(R0_1s)){
    # set variable parms
     R0_1 = R0_1s[i] # set wild type R0
-   # add solution to matrix
+   # add solution to vector
     probs.emergence[i,j] = pEmergence_additive(m=m, mu=mu, R0_1=R0_1, R0_2=R0_2, xstart=xstart, init=init)
   }
 }
@@ -120,12 +119,12 @@ for(j in 1:length(ms)){
 ### prepare probs.emergence for plotting
 # format wide df
 probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
-colnames(probs.emergence) = c("R0", paste0(ms, "types")) # add mu to columns
+colnames(probs.emergence) = c("R0", paste0(mus)) # add mu to columns
 
 # pivot to longform 
 probs.emergence.long = probs.emergence %>%
  pivot_longer(cols = !R0,
-  names_to = "m",
+  names_to = "mu",
   values_to = "Prob.Emergence"
 )
 
@@ -134,16 +133,18 @@ probs.emergence.long = probs.emergence %>%
 my.colors = c("black", "red", "green", "blue", "orange")
 ## plot
 ggplot() + 
-  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = m, col = m)) +
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) +
   theme_bw() +
   labs(x = "R0 of introduced pathogen", y = "Probability of emergence") +
-  scale_y_continuous(trans = "log10", limits = c(10^-8, 1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) +
   scale_color_manual(values = my.colors)
-
 
 ```
 
 For a better understanding of this model, please refer to `code/exploratory/AntiaNat2003_models.qmd`.
+
+
+run for multiple ms 
 
 # Effect of population immunity on emergence probability
 
