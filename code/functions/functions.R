@@ -139,11 +139,11 @@ pEmergence_additive = function(m, mu, R0_1, R0_2, xstart, init){ #m is number of
   return(prob.emergence)
 }
 
-
-#################### additive model ######################
-### Additive (fixed-step) R0 model where wtR0 determines how far from final type
+#################### fixed-step model ######################
+### Additive (fixed-step) R0 model where wtR0 determines how far from final type; final-type R0 >> 1
 ################### probability of emergence with fixed increase in R0 each mutation ########################
-pEmergence_fixed = function(m, mu, R0_1, R0_2) {
+
+pEmergence_fixed = function(m, mu, R0_1, R0_2, Rfinal) {
   ### calculate step size and breaks
   Rstep = R0_2/(m-1) #increase in R0 with each mutation
   breaks = Rstep*(1:(m)) #intervals describing the range of R0 for types (variants) with increasing number of mutations
@@ -156,6 +156,7 @@ pEmergence_fixed = function(m, mu, R0_1, R0_2) {
   ## calculate change in R0 from wt to each other variant
   delta_R0 = Rstep*c(-(type-1):0, 1:(m-type)) #vector of changes from wtR0 to the R0 of each other variant
   R0 = R0_1 + delta_R0 # add the changes from wtR0 to wtR0 to give R0 of each variant
+  R0[m] = Rfinal #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
   
   ### define probability of emergence
   prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting linneage
@@ -188,5 +189,3 @@ pEmergence_fixed = function(m, mu, R0_1, R0_2) {
   
   return(prob.emergence) 
 }
-
-
