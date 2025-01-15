@@ -153,7 +153,7 @@ for(i in 1:length(R0_1s)){
   ## in vaccinated population 
     pVax = pEmergence_single(mu = mu, R0_1 = R0_1s[i]*(1-f_vs[j]), R0_2 = R0_2, init = start, xstart = xstart) 
    # add solution to matrix
-    delta.p[i,j] = pWT - pVax
+    delta.p[i,j] = pWT / pVax
   }
 }
 
@@ -208,7 +208,7 @@ for(i in 1:length(R0_1s)){
   ## in vaccinated population 
     pVax = pEmergence_single(mu = mu, R0_1 = R0_1s[i]*(1-f_vs[j]), R0_2 = R0_2, init = start, xstart = xstart) 
    # add solution to matrix
-    delta.p[i,j] = pWT - pVax
+    delta.p[i,j] = pWT / pVax
   }
 }
 
@@ -218,7 +218,7 @@ for(i in 1:length(R0_1s)){
 ```{r plot-deltaP-varyMu}
 # parameters
 mus = c(10^-1, 10^-2, 10^-3, 10^-4) #mutation rate
-R0_1s = seq(0,1.2, by = 0.01) #R1s to test
+R0_1s = seq(0,1, by = 0.01) #R1s to test
 R0_2 = 1.2 #final R0_2
 f_vs = seq(0,1, by = 0.01) # fractions to test
 
@@ -242,7 +242,7 @@ myplots <- lapply(1:length(mus), function(j) {
     ## in vaccinated population 
       pVax = pEmergence_single(mu = mu, R0_1 = R0_1s[i]*(1-f_vs[j]), R0_2 = R0_2, init = start, xstart = xstart) 
      # add solution to matrix
-      delta.p[i,j] = pWT - pVax
+      delta.p[i,j] = pWT / pVax
     }
   }
   
@@ -263,7 +263,8 @@ myplots <- lapply(1:length(mus), function(j) {
   plot = ggplot() + 
           geom_tile(data = delta.p.long, aes(x = R0, y = frac_Vax, fill = log10(DeltaP))) + 
           labs(title = mu) +
-          scale_y_discrete(breaks = c(0.25, 0.5, 0.75, 1))
+          scale_y_discrete(breaks = c(0.25, 0.5, 0.75, 1)) +
+  scale_fill_gradient(low = "white", high = "blue")
   plot
 }
 )
