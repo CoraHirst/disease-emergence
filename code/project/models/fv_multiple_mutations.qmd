@@ -237,8 +237,8 @@ We plot the additive and fixed-step models below for varying numbers of total mu
 
 ```{r comparison-additive-fixed}
 ## parameters
-R0_1s = seq(0, 1.2, by = 0.01) #wt R0s to test
-R0_2 = 1.2 #R0 at which human-human transmission is achieved/end of interval
+R0_1s = seq(0, 1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0#R0 at which human-human transmission is achieved/end of interval
 ms = 2:6 #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
 
@@ -310,7 +310,7 @@ Below, we plot the fixed model with an approximation of the fixed model:
 ```{r}
 ## parameters
 R0_1s = seq(0, 1.2, by = 0.01) #wt R0s to test
-R0_2 = 1.2 #R0 at which human-human transmission is achieved/end of interval
+R0_2 = 5 #R0 at which human-human transmission is achieved/end of interval
 ms = 2:6 #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
 
@@ -375,13 +375,47 @@ probs.emergence.approximation = probs.emergence.approximation %>% #long form for
 ##### plot both
 ggplot() + 
   geom_line(data = probs.emergence.fixed, aes(x = R0, y = Prob.Emergence, group = m, col = m, linetype = "fixed")) +
-  geom_line(data = probs.emergence.approximation, aes(x = R0, y = Prob.Emergence, group = m, col = m, linetype = "approximation")) +
    theme_bw() +
   labs(x = "R0 of introduced pathogen", y = "Probability of emergence", title = "Approximation vs Fixed model") +
   scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) +
   scale_x_continuous(limits = c(0.01, 1)) +
-  scale_color_manual(values = my.colors, labels = ms) +
-  scale_linetype_manual(values = c("dashed", "solid"))
+  scale_color_manual(values = my.colors, labels = ms) 
 
 
 ```
+
+
+```{r}
+ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  ## parms 
+  R0_1 = .51 #R0_1 of initial wildtype
+  R0_2 = 1.51 #final adapted type R0_2
+  R0_int = 1.01 #intermediate R0
+  mu = 10^-3 #mutation rate (same for each type)
+
+  init = c(1,0,0) #vector initial numbers of infections of each type
+  xstart = c(1,0,0) #vector of initial guesses (between 0 and 1) for fixed point solution
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(3)
+    y[1] = exp(-(1-mu)*R0_1*(1-x[1]))*exp(-mu*R0_1*(1-x[2])) - x[1]
+    y[2] = exp(-(1-mu)*R0_int*(1-x[2]))*exp(-mu*R0_int*(1-x[3])) - x[2]
+    y[3] = exp(-R0_2*(1-x[3])) - x[3]
+    y
+  }
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+
+
+```
+
