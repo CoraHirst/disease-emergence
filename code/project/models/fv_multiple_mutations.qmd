@@ -201,8 +201,8 @@ mu = 10^-3 #mutation rate
 R0_1s = seq(0,1.0, by = 0.01) #wt R0s to test
 R0_2 = 1.0 #emergence R_0
 Rfinal = 1000 #final phenotype R_0
-f_vs = seq(0,1, by = 0.01) # fractions to test
-ms = 2:6 #number of possible phenotypes
+f_vs = seq(0,0.25, by = 0.01) # fractions to test
+ms = round(10^seq(0,2, by = 0.5)) #number of possible phenotypes
 
 
 #plot for each mu

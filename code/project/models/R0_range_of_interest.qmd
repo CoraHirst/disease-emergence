@@ -1,0 +1,128 @@
+---
+title: "Effect of Partial Vaccination on Preventing Emergent Zoonoses"
+subtitle: "for what range of spillover R0 does partial vaccination significantly delay emergence?" 
+format: html
+
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+library(gridExtra) #for arrangeing plots
+source(here("code", "functions", "functions.R"))
+
+```
+
+# Objective 
+
+
+# Model
+
+(We will be using the fixed model (show scheme) where $R_0 >> 1$ in the fully adapted phenotype.) 
+
+Below, we plot curves for `r paste("m =", ms)`.
+
+```{r plotting-pE-v-R0}
+## parameters
+R0_1s = seq(0, 1, by = 0.01) #wt R0s to test
+R0_2 = 1 #R0 at which human-human transmission is achieved/end of interval
+Rfinal = 1000 #R0 of final phenotype
+ms = seq(10, 80, by = 10) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3 #mutation rate
+
+## matrix to store emergence probabilities 
+probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(ms)){
+  for(i in 1:length(R0_1s)){
+    probs.emergence[i,j] = pEmergence_fixed(m = ms[j], mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #run simulation for each m,R0_1 combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence) = c("R0", ms) #name the columns for easy referencing
+probs.emergence = probs.emergence %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R0_1 column
+               names_to = "m", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R0_1 in R0_1 column
+
+## plot
+
+# colors for plotting
+#my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+# plot
+ggplot() + 
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m, col = m)) + #plot p emergence as function of R0_1 for each m
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of introduced pathogen", y = "Probability of Emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_y_continuous(trans = "log10") #+ #log10 y scale
+  #scale_color_manual(values = my.colors) #because pretty
+
+
+
+```
+
+
+
+```{r vary-m-ratio}
+# parameters
+mu = 10^-3 #mutation rate
+R0_1s = seq(0.5,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+f_vs = seq(0,0.25, by = 0.01) # fractions to test
+ms = seq(2, 12, by = 2) #how many types? m-1 mutations required, meaning m-2 intermediate types
+
+
+#plot for each mu
+myplots <- lapply(1:length(ms), function(j) {
+  m = ms[j] #set mu
+  # storage matrix 
+  delta.p = matrix(nrow = length(R0_1s), ncol = length(f_vs))
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(f_vs)){
+    ## wild-type probability
+      pWT = pEmergence_fixed(m = m, mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal)
+    ## in vaccinated population 
+      pVax = pEmergence_fixed(m = m, mu = mu, R0_1 = R0_1s[i]*(1-f_vs[j]), R0_2 = R0_2, Rfinal = Rfinal) 
+     # add solution to matrix
+      delta.p[i,j] = pWT / pVax
+    }
+  }
+  
+  
+  #format delta.p dataframe
+  delta.p = cbind(R0_1s, delta.p) %>% as.data.frame() #dataframe with R0s column
+  colnames(delta.p) = c("R0", f_vs) #column names for referencing
+  
+  #long-form 
+  delta.p.long = delta.p %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "frac_Vax",
+      values_to = "DeltaP"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = delta.p.long, aes(x = R0, y = frac_Vax, fill = log10(DeltaP))) + 
+          labs(x = "spillover R0", y = "fraction vaccinated", fill = "log10 FC PE", title = paste("m =", m)) +
+          scale_y_discrete(breaks = c(0.25, 0.5, 0.75, 1)) +
+  scale_fill_gradient(low = "white", high = "blue") 
+  plot
+}
+)
+do.call(grid.arrange, myplots)
+```
+
+The average time to emergence should be given as $\frac{1}{P_{emergence}*rate of introductions}$ for a variant with any given spillover $R_0$. This assumes that a variant with a given $R_0$ is introduced to the population at some rate, and each introduction event has a probability $P_emergence$ of starting an epidemic.
+
+Below, we plot $\frac{1}{P_{emergence}}$ for a given $R_0$, as well as the fold reduction in $\frac{1}{P_{emergence}}$
+
