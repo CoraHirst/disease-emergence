@@ -1,0 +1,161 @@
+---
+title: "figs_emergence_time"
+format: html
+editor: visual
+---
+
+# Objective 
+
+The time to emergence ($T_E$) of a zoonotic virus variant with some $R_0 < 1$ is the mean time to its evolution into a pandemic strain ($R_0 > 1$), given a constant rate of initial spillover infections ($r$), rate of mutation $\mu$, and number of possible phenotypes along the path to adaptation ($m$). The goal of this document is to determine the combinations of these variables of a zoonotic spillover variant for which $T_E$ is relatively short, but not so short that small increases in population vaccination can reduce it significantly. For the purpose of this exercise, we define this range as on the order of months to years. 
+
+# Method 
+
+We will be using the model developed in `code/exploratory/stepwise_mutations.R`. In this model, a variant with an $R_0 = 0$ in the human population can have $m$ phenotypes, defined as increasing $R_0$. From one phenotype to the next, the variant must acquire a new mutation, meaning $m-1$ total mutations are required to adapt to a new host with an $R_0 > 1$ when starting at a low $R_0$.
+
+We assume that each mutation results in a fixed increase in $R_0$. Critical to the model is the notion that a variant's $R_0$ determines the number of mutations the variant must still acquire to adapt (see scheme below.)
+
+We model this as multitype branching process with $m$ different types. We start with 1 infection of type $i$; the $R_0$ of the spillover variant (initial infection in the new population) determines with which of the $m$ types this process begins. An infection can only cause infections with the same phenotype $i$ or infections with a newly mutated type, $i+1$. The virus mutates at a rate of $\mu$, such that the number of secondary cases of type $i$ caused by infection with type $i$ is sampled from a Poisson distribution with mean $(1-\mu)R_0^i$ and the number of secondary cases of type $i+1$ - the next phenotype with a new mutation - is sampled from a Poisson distribution with mean $\mu R_0^i$. 
+
+For each spillover $R_0$, a probability of emergence ($P_E$) can be calculated. The spillover $R_0$ determines which of the $m$ phenotypes the first infection occupies, such that a variant of the $ith$ phenotype is $m-i$ mutations away from adaptation. $P_E$ is thus the complement of the probability that a lineage initiated by an infection with the spillover $R_0$ acquires the $m-i$ mutations required for adaptation before it goes extinct. 
+
+```{r PE-scheme}
+
+
+```
+
+# Where might vaccination be most effective?
+
+Effectively, vaccinating a portion of the population reduces the transmissibility of the variant by the same proportion. Given that some fraction $f_v$ of the population is vaccinated and immune to infection, the $R_0$ of a spillover variant is reduced by that fraction. 
+
+The effect of vaccination becomes apparent when the reduction in $R_0$ of a spillover variant of type $i$ results in the variant requiring more mutations to adapt to a pandemic strain. Requiring more mutations can quickly reduce the probability of emergence. 
+
+We are most interested in how $T_E$ may be affected by vaccination. Changing the time to emergence 100-fold may be significant if the change is from 1 year to 100 years, but less so if the change is from 1 day to 100 days. We would like to observe which combinations of $r$, $\mu$, $m$, and spillover $R_0$ result in a $T_E$ on the order of months to years, but greater than days and less than decades. 
+
+In the code chunk below, we plot heatmaps of $T_E$ as a function of mutation rate $\mu$ and $R_0$ of introduced pathogen. From left to right, the number of possible phenotypes in the evolutionary path, $m$, increases from 5 to 10, to 20. The top row assumes a spillover rate of $10^2 y^{-1}$, and the bottom row assumes a spillover rate of $10^3 y^{-1}$. 
+
+```{r heatmaps_te}
+# parameters
+mus = 10^seq(-5,-1, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+rs = c(10^2, 10^3) #introduction rate per year
+
+# combinations of parameters 
+parms.grid = expand.grid("m" = ms, "r" = rs) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  r = parms.grid[plot, "r"] # introduction rate
+  
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed(m = m, mu = mus[j], R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal)*r) #1/p * rate
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format delta.p dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = T.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE", title = paste0("m = ", m, ", r = ", r)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue") +
+     geom_contour(data = T.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+               breaks = c(1,2), col = 'maroon')
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 2))
+
+```
+
+```{r heatmaps_te}
+# parameters
+mus = 10^seq(-1,-3, by = -1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+rs = 10^seq(2,4, by = 0.1) #introduction rate per year
+
+# combinations of parameters 
+parms.grid = expand.grid("m" = ms, "mu" = mus) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and mu
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  mu = parms.grid[plot, "mu"] # mutation rate
+  
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(rs)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(rs)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed(m = m, mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal)*rs[j]) #1/p * rate
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format delta.p dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", rs) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Intro.Rate",
+      values_to = "T.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = T.Es.long, aes(x = R0, y = as.numeric(Intro.Rate), fill = log10(T.Emergence))) + 
+          labs(x = "spillover R0", y = "introduction rate", fill = "log10 TE", title = paste0("m = ", m, ", mu = ", mu)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -3, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue") +
+     geom_contour(data = T.Es.long, aes(x = R0, y = as.numeric(Intro.Rate), z = log10(T.Emergence)), 
+               breaks = c(1,2), col = 'maroon')
+  plot
+}
+)
+
+
+#plot grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+

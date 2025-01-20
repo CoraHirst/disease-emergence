@@ -1,6 +1,6 @@
 ---
 title: "Vaccination Efficacy for Zoonoses with Varying Spillover $R_0$"
-subtitle: "For viruses requiring multiple mutations to adapt"
+subtitle: "Simulating disease emergence for viruses requiring multiple mutations to adapt"
 format: pdf
 execute:
   echo: false
@@ -248,4 +248,4 @@ myplots <- lapply(1:length(ms), function(j) {
 do.call(grid.arrange, myplots)
 ```
 
-
+We investigate this relationship further in `code/project/R0_range_of_interest.qmd`.
