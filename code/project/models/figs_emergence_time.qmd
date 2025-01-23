@@ -4,6 +4,19 @@ format: html
 editor: visual
 ---
 
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+library(gridExtra) #for arrangeing plots
+source(here("code", "functions", "functions.R"))
+
+```
+
+
+
 # Objective 
 
 The time to emergence ($T_E$) of a zoonotic virus variant with some $R_0 < 1$ is the mean time to its evolution into a pandemic strain ($R_0 > 1$), given a constant rate of initial spillover infections ($r$), rate of mutation $\mu$, and number of possible phenotypes along the path to adaptation ($m$). The goal of this document is to determine the combinations of these variables of a zoonotic spillover variant for which $T_E$ is relatively short, but not so short that small increases in population vaccination can reduce it significantly. For the purpose of this exercise, we define this range as on the order of months to years. 
@@ -85,7 +98,7 @@ myplots <- lapply(1:nrow(parms.grid), function(plot) {
          scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
   scale_fill_gradient(low = "white", high = "blue") +
      geom_contour(data = T.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
-               breaks = c(1,2), col = 'maroon')
+               breaks = c(-1,1), col = 'maroon')
   plot
 }
 )
@@ -98,11 +111,11 @@ do.call(grid.arrange, list("grobs" = myplots, "nrow" = 2))
 
 ```{r heatmaps_te}
 # parameters
-mus = 10^seq(-1,-3, by = -1) #mutation rate
+mus = 10^seq(-3,-6, by = -1) #mutation rate
 R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
 R0_2 = 1.0 #emergence R_0
 Rfinal = 1000 #final phenotype R_0
-ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+ms = c(5,10,100) #how many types? m-1 mutations required, meaning m-2 intermediate types
 rs = 10^seq(2,4, by = 0.1) #introduction rate per year
 
 # combinations of parameters 
@@ -148,14 +161,14 @@ myplots <- lapply(1:nrow(parms.grid), function(plot) {
          scale_y_continuous(breaks = 10^seq(-1, -3, -1), trans = "log10") +
   scale_fill_gradient(low = "white", high = "blue") +
      geom_contour(data = T.Es.long, aes(x = R0, y = as.numeric(Intro.Rate), z = log10(T.Emergence)), 
-               breaks = c(1,2), col = 'maroon')
+               breaks = c(-1,1), col = 'maroon')
   plot
 }
 )
 
 
 #plot grid
-do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = length(mus)))
 
 ```
 
