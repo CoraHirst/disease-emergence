@@ -175,6 +175,136 @@ ggplot() +
 
 ```
 
+Finally, we will plot the probability of emergence, $P_E$ as a function of $\mu$ and spillover $R_0$, for combinations of $m$ and $f_v$.  Ultimately, we would like to observe the extent to which varying degrees of vaccination change the probability of emergence for zoonotic spillovers with varying $R_0$ and mutation rates, according to how many mutations are required to adapt to human hosts. 
+
+```{r PE-m-fv}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(0,.05,.10,.2) #portion of population vaccinated
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  P.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      P.E = pEmergence_fixed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      P.Es[i,j] = P.E #add to matrix for plotting
+    }
+  }
+  
+  #format P.Es dataframe
+  P.Es = cbind(R0_1s, P.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(P.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  P.Es.long = P.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "P.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = P.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(P.Emergence))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 PE", title = paste0("Fv = ", fv, ", m = ", m)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue", limits = c(-15, 0)) 
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+
+Finally, we would like to plot the fold change in the P.E for a wild-type variant with a given spillover $R_0$ in an unvaccinated population as the fraction of vaccinated individuals increases. 
+
+```{r FC-PE-m-fv}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(.05,.10,.2) #portion of population vaccinated
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  delta.Ps = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      pWT = pEmergence_fixed(m = m, mu = mus[j], R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability with spillover wt R0
+      
+      ## vaccination probability
+      pVax = pEmergence_fixed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for spillover R0 in vaccinated population
+    
+     # add solution to matrix
+      delta.Ps[i,j] = pWT / pVax #add to matrix for plotting
+    }
+  }
+  
+  #format P.Es dataframe
+  delta.Ps = cbind(R0_1s, delta.Ps) %>% as.data.frame() #dataframe with R0s column
+  colnames(delta.Ps) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  delta.Ps.long = delta.Ps %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "deltaP"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = delta.Ps.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(deltaP))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 deltaP", title = paste0("Fv = ", fv, ", m = ", m)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue") 
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+
+
 # Notes
 
 - effectiveness of intervening is higher when variants require many mutations (start with the same prob of emergence, fraction of vaccinatio pushes farther down on steeper curve)

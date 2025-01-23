@@ -109,6 +109,9 @@ do.call(grid.arrange, list("grobs" = myplots, "nrow" = 2))
 
 ```
 
+
+Below, we plot a heatmap of the emergence time as a function of introduction rate and spillover $R_0$ for different combinations of mutation rate and number of mutations required for adaptation: 
+
 ```{r heatmaps_te}
 # parameters
 mus = 10^seq(-3,-6, by = -1) #mutation rate
