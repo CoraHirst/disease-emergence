@@ -1,0 +1,382 @@
+---
+title: "Effect of partial vaccination and pathogen evolution landscape on disease emergence"
+subtitle: "How does partial vaccination effect the probability of and time to emergence of pathogens with different characteristics? "
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+library(gridExtra) #for arrangeing plots
+source(here("code", "functions", "poisson_functions.R"))
+
+```
+
+
+# Objective
+
+In this document, we explore how the mutational landscape, mutation rate, and spillover $R_0$ effect the probability of disease emergence, $P_{emergence}$ in unvaccinated and partially vaccinated populations. For the purpose of this analysis, we consider the "mutational landscape" as a series of mutations that each increase the $R_0$ of the pathogen by some fixed amount (inversely proportional to the number of mutations required for adaptation), which gives $m$ possible phenotypes defined by $R_0$ from least (lower bound $R_0 = 0$) to fully adapted (lower bound $R_0 = 1$); the mutation rate $\mu$ as the probability that an infection gives rise to an infection with a pathogen with the next mutation in the landscape; and the spillover $R_0$ as the $R_0$ of the first infection in the new host population, given there is no immunity (vaccination), which we denote as $R0_1$. The degree of vaccination (fraction of the population immune to infection) is denoted as $f_v$.
+
+We will plot: 
+  
+  1) heatmaps showing the dependence of $P_{emergence}$ on $\mu$ and $R0_1$, given different combinatons of $m$ and $f_v$;
+  2) heatmaps showing the change $P_{emergence}$, or $\Delta P_{emergence}$, as a function of $\mu$ and $R0_1$ given different combinations of $m$ and $f_v$; 
+  3) the above two sets of heatmaps showing the mean time to emergence, $T_{emergence}$ and change in mean time to emergence, $\Delta T_{emergence}$ for different combinations of $m$ and $f_v$; 
+  4) and finally, replotting the probability and time to emergence heatmaps with contours showing the range in which time to emergence increases from worriesome (on the order of months to years) to highly unlikely (decades). 
+  
+Our goal is to understand when and the extent to which partial vaccination may be helpful in controlling zoonoses with pandemic potential, like Mpox or H5N1 Influenza. 
+
+We will develop these plots in the scenario that the number of secondary cases caused by an infection is evenly dispersed (poisson-distributed), and the scenario where the number of secondary cases is overly dispersed as a result of superspreading (negative binomially-distributed)
+
+
+## Model outline 
+
+We model the course of infections using a multi-type branching process framework with $m$ types. Each infection can only beget infections with a variant with the same number of mutations, type $i$, or a variant with an additional mutation, type $i+1$. 
+
+$R_0^{i+1}$ increases from $R_0^i$ by a fixed step size equal to $\frac{1}{(m-1)}$, or the inverse of the number of mutations required for adaptation. The $R_0$ of the final type, $m$, is set to a maximum limit on the $R_0$ of the evolved virus, to approximate the fast accumulation of mutations after an infection with $R_0 > 1$ is achieved. 
+
+Importantly, the initial $R_0$ of the pathogen determines the number of mutations in the mutational landscape the pathogen has acquired pre-spillover, that is, by circulating in its native host. Thus, the branching process starts with an infection of type $i$. (Figure here for scheme would be good.)
+
+We define the probability of emergence for a pathogen with a given $R0_1$ as the complement of the extinction probability of a lineage starting with that $R_0$, that is, $P_{emergence} = 1-P_{extinction}$.
+
+Changes in the probability of emergence are only truly meaningful in the context of time to emergence, where increasing the number and timing of spillover infections required (zoonoses) to achieve a successful lineage increases from realistic to unrealistic time scales. 
+
+We define the mean time to emergence for a pathogen with a given $R0_1$ as $T_{emergence} = \frac{1}{P_{emergence}}*\rho$, where $\rho$ denotes the rate of zoonoses.
+
+## Distributions for number of secondary infections
+
+We exam two scenarios, where the distribution in the number of secondary cases caused by a given infection is either poisson (evenly dispersed) or negative-binomial (overly dispersed). 
+
+For the evenly dispersed scenario: 
+The number of secondary infections of type $i$ from an infection of type $i$ is poisson-distributed with mean  $(1-\mu)R_0^i$, and the number of secondary infections of type $i+1$ from an infection of type $i$ is poisson-distributed with a mean $\mu R_0^i$. The total number of secondary cases caused by an infection is poisson distributed with a mean of $R_0^i$ (useful for generating function of the $m_{th}$ type.)
+
+For the overly dispersed scenario:
+
+The number of secondary infections of type $i$ from an infection of type $i$ is negative binomially-distributed with mean $(1-\mu)(\frac{r(1-R_0^i)}{R_0^i})$ and rate $r$ corresponding to the degree of overdispersion, and the number of secondary infections of type $i+1$ from an infection of type $i$ is negative-binomially distributed with a mean  $\mu(\frac{r(1-R_0^i)}{R_0^i})$. The total number of secondary cases caused by an infection is negative-binomially distributed with mean $(\frac{r(1-R_0^i)}{R_0^i})$ (useful for generating function of the $m_{th}$ type.)
+
+## Effect of partial vaccination
+
+We would like to understand the extent to which vaccinating even a small fraction of the new host population can reduce the probability of the pathogen evolving a pandemic $R_0 > 1$. 
+
+In this model, vaccination reduces the spillover $R_0$ by the fraction vaccinated, $f_v$, such that $R0_{1,vax} = (1-f_v)R0_{1,wt}$. We calculate the fold change in both $P_{emergence}$ and $T_{emergence}$ for a given spillover $R0_1$ from emergence in an unvaccinated population to emergence in a population with proportion $f_v$ individuals immune to infection. 
+
+## Limitations
+
+Note that we are not yet considering the efect of multiple spillovers and extinction events on establishing some fraction of population immunity, but we should investigate this in the future. 
+
+We can also imagine different mutational landscapes...  
+
+
+# Even dispersion 
+
+We will plot the probability of emergence and fold change in probability of emergence with vaccination and mutational landscape; the time to emergence (average) and fold change in time to emergence with vaccination and mutational landscape; and finally, plot the contours of the range of helpfulness from the time to emergence plots.  
+
+Below, we plot the dependence of $P_{emergence}$ on $\mu$ and $R0_1$, given different combinatons of $m$ and $f_v$. 
+
+
+```{r Pemergence-heatmaps}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(0,.05,.10,.2) #portion of population vaccinated
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  P.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      P.E = pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      P.Es[i,j] = P.E #add to matrix for plotting
+    }
+  }
+  
+  #format P.Es dataframe
+  P.Es = cbind(R0_1s, P.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(P.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  P.Es.long = P.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "P.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = P.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(P.Emergence))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 PE", title = paste0("Fv = ", fv, ", m = ", m)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue", limits = c(-15, 0)) 
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+
+Below, we plot the fold change in $P_{emergence}$ from $f_v = 0$ to introduction to a population with some fraction of vaccination, $f_v > 0$. 
+
+```{r delta-Pemergence-heatmaps}
+
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(.05,.10,.2) #portion of population vaccinated
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  delta.Ps = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      pWT = pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability with spillover wt R0
+      
+      ## vaccination probability
+      pVax = pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for spillover R0 in vaccinated population
+    
+     # add solution to matrix
+      delta.Ps[i,j] = pWT / pVax #add to matrix for plotting
+    }
+  }
+  
+  #format P.Es dataframe
+  delta.Ps = cbind(R0_1s, delta.Ps) %>% as.data.frame() #dataframe with R0s column
+  colnames(delta.Ps) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  delta.Ps.long = delta.Ps %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "deltaP"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = delta.Ps.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(deltaP))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 deltaP", title = paste0("Fv = ", fv, ", m = ", m)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue") 
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+
+## times to emergence
+
+```{r Temergence-heatmaps}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(0,.05,.10,.2) #portion of population vaccinated
+rho = 10^3
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#plot for each m and r combo
+myplots <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = T.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 PE", title = paste0("Fv = ", fv, ", m = ", m)) +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue") 
+  plot
+}
+)
+
+
+#plot together on one grid
+do.call(grid.arrange, list("grobs" = myplots, "nrow" = 3))
+
+```
+
+What I would really like to do is plot in the first column $T_E$ with no vaccination, and show the region where emergence time is on the order of months to years. In subsequent plots row-wie (that is, same mutational landscape with difference vaccination fractions), plot the SAME region as the initial plot and show what the times to emergence in this range are, and on a separate set of heatmaps for FC in times to emergence. 
+
+
+So, lets do that :)
+
+
+```{r times-to-range}
+### first set for FV = 0 
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+fv= 0  #portion of population vaccinated
+rho = 10^3 #introduction rate
+
+#list to store wt dfs
+wt_list = list()
+
+wt_list <- lapply(1:length(ms), function(plot) {
+ # set m and r
+  m =  ms[plot] # number of possible phenotypes
+ 
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  }
+)
+```
+
+And now we create a list for the rest of our combinations: 
+
+```{r times-to-combos}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(.05,.10,.2) #portion of population vaccinated
+rho = 10^3
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#list for storing combos
+fv_list = list()
+
+#plot for each m and r combo
+fv_list <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  }
+)
+
+```
+
+
+```{r plot-try}
+
+```

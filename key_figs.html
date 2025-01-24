@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Effect of partial vaccination and pathogen evolution landscape on disease emergence</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="key_figs_files/libs/clipboard/clipboard.min.js"></script>
+<script src="key_figs_files/libs/quarto-html/quarto.js"></script>
+<script src="key_figs_files/libs/quarto-html/popper.min.js"></script>
+<script src="key_figs_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="key_figs_files/libs/quarto-html/anchor.min.js"></script>
+<link href="key_figs_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="key_figs_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="key_figs_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="key_figs_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="key_figs_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Effect of partial vaccination and pathogen evolution landscape on disease emergence</h1>
+<p class="subtitle lead">How does partial vaccination effect the probability of and time to emergence of pathogens with different characteristics?</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="objective" class="level1">
+<h1>Objective</h1>
+<p>In this document, we explore how the mutational landscape, mutation rate, and spillover <span class="math inline">\(R_0\)</span> effect the probability of disease emergence, <span class="math inline">\(P_{emergence}\)</span> in unvaccinated and partially vaccinated populations. For the purpose of this analysis, we consider the “mutational landscape” as a series of mutations that each increase the <span class="math inline">\(R_0\)</span> of the pathogen by some fixed amount (inversely proportional to the number of mutations required for adaptation), which gives <span class="math inline">\(m\)</span> possible phenotypes defined by <span class="math inline">\(R_0\)</span> from least (lower bound <span class="math inline">\(R_0 = 0\)</span>) to fully adapted (lower bound <span class="math inline">\(R_0 = 1\)</span>); the mutation rate <span class="math inline">\(\mu\)</span> as the probability that an infection gives rise to an infection with a pathogen with the next mutation in the landscape; and the spillover <span class="math inline">\(R_0\)</span> as the <span class="math inline">\(R_0\)</span> of the first infection in the new host population, given there is no immunity (vaccination), which we denote as <span class="math inline">\(R0_1\)</span>. The degree of vaccination (fraction of the population immune to infection) is denoted as <span class="math inline">\(f_v\)</span>.</p>
+<p>We will plot:</p>
+<ol type="1">
+<li>heatmaps showing the dependence of <span class="math inline">\(P_{emergence}\)</span> on <span class="math inline">\(\mu\)</span> and <span class="math inline">\(R0_1\)</span>, given different combinatons of <span class="math inline">\(m\)</span> and <span class="math inline">\(f_v\)</span>;</li>
+<li>heatmaps showing the change <span class="math inline">\(P_{emergence}\)</span>, or <span class="math inline">\(\Delta P_{emergence}\)</span>, as a function of <span class="math inline">\(\mu\)</span> and <span class="math inline">\(R0_1\)</span> given different combinations of <span class="math inline">\(m\)</span> and <span class="math inline">\(f_v\)</span>;</li>
+<li>the above two sets of heatmaps showing the mean time to emergence, <span class="math inline">\(T_{emergence}\)</span> and change in mean time to emergence, <span class="math inline">\(\Delta T_{emergence}\)</span> for different combinations of <span class="math inline">\(m\)</span> and <span class="math inline">\(f_v\)</span>;</li>
+<li>and finally, replotting the probability and time to emergence heatmaps with contours showing the range in which time to emergence increases from worriesome (on the order of months to years) to highly unlikely (decades).</li>
+</ol>
+<p>Our goal is to understand when and the extent to which partial vaccination may be helpful in controlling zoonoses with pandemic potential, like Mpox or H5N1 Influenza.</p>
+<p>We will develop these plots in the scenario that the number of secondary cases caused by an infection is evenly dispersed (poisson-distributed), and the scenario where the number of secondary cases is overly dispersed as a result of superspreading (negative binomially-distributed)</p>
+<section id="model-outline" class="level2">
+<h2 class="anchored" data-anchor-id="model-outline">Model outline</h2>
+<p>We model the course of infections using a multi-type branching process framework with <span class="math inline">\(m\)</span> types. Each infection can only beget infections with a variant with the same number of mutations, type <span class="math inline">\(i\)</span>, or a variant with an additional mutation, type <span class="math inline">\(i+1\)</span>.</p>
+<p><span class="math inline">\(R_0^{i+1}\)</span> increases from <span class="math inline">\(R_0^i\)</span> by a fixed step size equal to <span class="math inline">\(\frac{1}{(m-1)}\)</span>, or the inverse of the number of mutations required for adaptation. The <span class="math inline">\(R_0\)</span> of the final type, <span class="math inline">\(m\)</span>, is set to a maximum limit on the <span class="math inline">\(R_0\)</span> of the evolved virus, to approximate the fast accumulation of mutations after an infection with <span class="math inline">\(R_0 &gt; 1\)</span> is achieved.</p>
+<p>Importantly, the initial <span class="math inline">\(R_0\)</span> of the pathogen determines the number of mutations in the mutational landscape the pathogen has acquired pre-spillover, that is, by circulating in its native host. Thus, the branching process starts with an infection of type <span class="math inline">\(i\)</span>. (Figure here for scheme would be good.)</p>
+<p>We define the probability of emergence for a pathogen with a given <span class="math inline">\(R0_1\)</span> as the complement of the extinction probability of a lineage starting with that <span class="math inline">\(R_0\)</span>, that is, <span class="math inline">\(P_{emergence} = 1-P_{extinction}\)</span>.</p>
+<p>Changes in the probability of emergence are only truly meaningful in the context of time to emergence, where increasing the number and timing of spillover infections required (zoonoses) to achieve a successful lineage increases from realistic to unrealistic time scales.</p>
+<p>We define the mean time to emergence for a pathogen with a given <span class="math inline">\(R0_1\)</span> as <span class="math inline">\(T_{emergence} = \frac{1}{P_{emergence}}*\rho\)</span>, where <span class="math inline">\(\rho\)</span> denotes the rate of zoonoses.</p>
+</section>
+<section id="distributions-for-number-of-secondary-infections" class="level2">
+<h2 class="anchored" data-anchor-id="distributions-for-number-of-secondary-infections">Distributions for number of secondary infections</h2>
+<p>We exam two scenarios, where the distribution in the number of secondary cases caused by a given infection is either poisson (evenly dispersed) or negative-binomial (overly dispersed).</p>
+<p>For the evenly dispersed scenario: The number of secondary infections of type <span class="math inline">\(i\)</span> from an infection of type <span class="math inline">\(i\)</span> is negative binomially-distributed with mean <span class="math inline">\((1-\mu)R_0^i\)</span> and rate <span class="math inline">\(r\)</span> corresponding to the degree of overdispersion, and the number of secondary infections of type <span class="math inline">\(i+1\)</span> from an infection of type <span class="math inline">\(i\)</span> is negative-binomially distributed with a mean <span class="math inline">\(\mu R_0^i\)</span>.</p>
+<p>For the overly dispersed scenario: The number of secondary infections of type <span class="math inline">\(i\)</span> from an infection of type <span class="math inline">\(i\)</span> is poisson-distributed with mean <span class="math inline">\((1-\mu)(\frac{r(1-R_0^i)}{R_0^i})\)</span>, and the number of secondary infections of type <span class="math inline">\(i+1\)</span> from an infection of type <span class="math inline">\(i\)</span> is poisson-distributed with a mean <span class="math inline">\(\mu (\frac{r(1-R_0^i)}{R_0^i})\)</span>.</p>
+</section>
+<section id="effect-of-partial-vaccination" class="level2">
+<h2 class="anchored" data-anchor-id="effect-of-partial-vaccination">Effect of partial vaccination</h2>
+<p>We would like to understand the extent to which vaccinating even a small fraction of the new host population can reduce the probability of the pathogen evolving a pandemic <span class="math inline">\(R_0 &gt; 1\)</span>.</p>
+<p>In this model, vaccination reduces the spillover <span class="math inline">\(R_0\)</span> by the fraction vaccinated, <span class="math inline">\(f_v\)</span>, such that <span class="math inline">\(R0_{1,vax} = (1-f_v)R0_{1,wt}\)</span>. We calculate the fold change in both <span class="math inline">\(P_{emergence}\)</span> and <span class="math inline">\(T_{emergence}\)</span> for a given spillover <span class="math inline">\(R0_1\)</span> from emergence in an unvaccinated population to emergence in a population with proportion <span class="math inline">\(f_v\)</span> individuals immune to infection.</p>
+</section>
+<section id="limitations" class="level2">
+<h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
+<p>Note that we are not yet considering the efect of multiple spillovers and extinction events on establishing some fraction of population immunity, but we should investigate this in the future.</p>
+<p>We can also imagine different mutational landscapes…</p>
+</section>
+</section>
+<section id="now-we-can-make-heatmaps-yayyyy." class="level1">
+<h1>Now we can make heatmaps yayyyy.</h1>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
