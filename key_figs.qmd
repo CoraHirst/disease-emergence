@@ -377,6 +377,47 @@ fv_list <- lapply(1:nrow(parms.grid), function(plot) {
 ```
 
 
-```{r plot-try}
+```{r plot}
+
+### We would like our wt_list figures to go in column 1, then the corresponding fv_list figures to follow in the next columns. 
+
+wtplots <- lapply(1:length(wt_list), function(i) {
+  plot = ggplot() + 
+    geom_tile(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+              labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE") +
+       # scale_x_continuous(limits = c(0.75, 1)) +
+    scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+     geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                 breaks = c(-1,1), col = 'maroon')   +     
+    scale_fill_gradient(low = "white", high = "blue")
+})
+  
+fvplots <- lapply(1:length(wt_list), function(i) {  
+    lapply((length(f_vs) - 1):0, function(j) {
+    plot2 = ggplot() + 
+      geom_tile(data = fv_list[[(3*i) - j]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+                labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE") +
+         # scale_x_continuous(limits = c(0.75, 1)) +
+      scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+       geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                   breaks = c(-1,1), col = 'maroon')   +     
+      scale_fill_gradient(low = "white", high = "blue") 
+    })
+})
+
+# combine all fvplots into a list
+fv_plots = do.call(c, fvplots) # combine all plots to one
+
+plots = list() 
+
+plots[c(1,5,9)] = wtplots
+plots[c(2,3,4)] = fv_plots[c(1,2,3)]
+plots[c(6,7,8)] = fv_plots[c(4,5,6)]
+plots[c(10,11,12)] = fv_plots[c(7,8,9)]
+
+
+do.call(grid.arrange, list("grobs" = plots, "nrow" = length(wt_list)))
+
+
 
 ```
