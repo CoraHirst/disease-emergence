@@ -74,6 +74,24 @@ We can also imagine different mutational landscapes...
 
 We will plot the probability of emergence and fold change in probability of emergence with vaccination and mutational landscape; the time to emergence (average) and fold change in time to emergence with vaccination and mutational landscape; and finally, plot the contours of the range of helpfulness from the time to emergence plots.  
 
+It is helpful to see how $P_Emergence$ depends on the $R_0$ of the initial spillover infection and the number of mutations required for adaptation: 
+
+```{r PE_curves}
+# parameters
+mus = c(10^-3, 10^-5) #mutation rate
+R0_1s = seq(0.5,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+
+
+
+
+
+
+```
+
+
 Below, we plot the dependence of $P_{emergence}$ on $\mu$ and $R0_1$, given different combinatons of $m$ and $f_v$. 
 
 
@@ -172,7 +190,7 @@ myplots <- lapply(1:nrow(parms.grid), function(plot) {
       pVax = pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for spillover R0 in vaccinated population
     
      # add solution to matrix
-      delta.Ps[i,j] = pWT / pVax #add to matrix for plotting
+      delta.Ps[i,j] = pVax / pWT #add to matrix for plotting
     }
   }
   
@@ -194,7 +212,7 @@ myplots <- lapply(1:nrow(parms.grid), function(plot) {
           labs(x = "spillover R0", y = "mutation rate", fill = "log10 deltaP", title = paste0("Fv = ", fv, ", m = ", m)) +
    # scale_x_continuous(limits = c(0.75, 1)) +
          scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
-  scale_fill_gradient(low = "white", high = "blue") 
+  scale_fill_gradient(low = "blue", high = "white", limits = c(-10, 1)) 
   plot
 }
 )
@@ -389,7 +407,7 @@ wtplots <- lapply(1:length(wt_list), function(i) {
     scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
      geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
                  breaks = c(-1,1), col = 'maroon')   +     
-    scale_fill_gradient(low = "white", high = "blue")
+    scale_fill_gradient(low = "white", high = "blue", limits = c(-1,10))
 })
   
 fvplots <- lapply(1:length(wt_list), function(i) {  
@@ -401,23 +419,359 @@ fvplots <- lapply(1:length(wt_list), function(i) {
       scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
        geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
                    breaks = c(-1,1), col = 'maroon')   +     
-      scale_fill_gradient(low = "white", high = "blue") 
+      scale_fill_gradient(low = "white", high = "blue", limits = c(-1,10)) 
     })
 })
 
 # combine all fvplots into a list
 fv_plots = do.call(c, fvplots) # combine all plots to one
 
+#empty plot list to store plots in correct order
 plots = list() 
 
+#arrange plots for grid.arrange
 plots[c(1,5,9)] = wtplots
 plots[c(2,3,4)] = fv_plots[c(1,2,3)]
 plots[c(6,7,8)] = fv_plots[c(4,5,6)]
 plots[c(10,11,12)] = fv_plots[c(7,8,9)]
 
 
-do.call(grid.arrange, list("grobs" = plots, "nrow" = length(wt_list)))
+# plot panels in one figure using grid.arrange
+do.call(grid.arrange, list("grobs" = plots, 
+                           top="fraction vaccinated ->", 
+                           left="<- # mutations", 
+                           "nrow" = length(wt_list)))
 
 
 
 ```
+
+## Fold change in times to emergence
+
+We want to plot a very similar figure, but this time, with the $T_E$ of each wildtype combination in an unvaccinated population in the first column, and the fold changes in time to emergence with each portion vaccinated in the following columns. We want to keep the contours of the range of worriesome times to emergence in the unvaccinated population across the plots with added vaccination, to demonstrate the fold change in the parameter regimes of significance. 
+
+Below, we calculate the times to emergence as a function of $mu$ and initial $R_0$ for spillovers with various $m$. 
+
+```{r foldchange-timesto}
+### first set for FV = 0 
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+fv= 0  #portion of population vaccinated
+rho = 10^3 #introduction rate
+
+#list to store wt dfs
+wt_list = list()
+
+wt_list <- lapply(1:length(ms), function(plot) {
+ # set m and r
+  m =  ms[plot] # number of possible phenotypes
+ 
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  }
+)
+```
+
+And now we create a list to show the fold change in time to emergence for each $m$ as the portion of the population vaccinated increases:
+
+```{r times-to-combos}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(.05,.10,.2) #portion of population vaccinated
+rho = 10^3
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#list for storing combos
+fv_list = list()
+
+#plot for each m and r combo
+fv_list <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  fcT.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      fvT.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+    ## wild-type probability
+      wtT.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+      
+     # add solution to matrix
+      fcT.Es[i,j] = fvT.E/wtT.E # ratio add to matrix for plotting # larger ratio means bigger difference
+    }
+  }
+  
+  #format T.Es dataframe
+  fcT.Es = cbind(R0_1s, fcT.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(fcT.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  fcT.Es.long = fcT.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "FC"
+    )
+  }
+)
+
+```
+
+Below, we plot the time to emergence for a pathogen with each $m$ in an unvaccinated population in the first column, and rowise show how the time to emergence changes as a function of the portion of the population vaccinated: 
+
+
+```{r plot fc-times-to}
+### We would like our wt_list figures to go in column 1, then the corresponding fv_list figures to follow in the next columns. 
+wtplots <- lapply(1:length(wt_list), function(i) {
+  plot = ggplot() + 
+    geom_tile(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+              labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE") +
+       # scale_x_continuous(limits = c(0.75, 1)) +
+    scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+     geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                 breaks = c(-1,1), col = 'maroon')   +     
+    scale_fill_gradient(low = "white", high = "blue", limits = c(-1, 10))
+})
+  
+fvplots <- lapply(1:length(wt_list), function(i) {  
+    lapply((length(f_vs) - 1):0, function(j) {
+    plot2 = ggplot() + 
+      geom_tile(data = fv_list[[(3*i) - j]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(FC))) + 
+                labs(x = "spillover R0", y = "mutation rate", fill = "log10 FC TE") +
+         # scale_x_continuous(limits = c(0.75, 1)) +
+      scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+       geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                   breaks = c(-1,1), col = 'maroon')   +     
+      scale_fill_gradient(low = "white", high = "blue", limits = c(-1, 10)) 
+    })
+})
+
+# combine all fvplots into a list
+fv_plots = do.call(c, fvplots) # combine all plots to one
+
+#empty plot list to store plots in correct order
+plots = list() 
+
+#arrange plots for grid.arrange
+plots[c(1,5,9)] = wtplots
+plots[c(2,3,4)] = fv_plots[c(1,2,3)]
+plots[c(6,7,8)] = fv_plots[c(4,5,6)]
+plots[c(10,11,12)] = fv_plots[c(7,8,9)]
+
+
+# plot panels in one figure using grid.arrange
+do.call(grid.arrange, list("grobs" = plots, 
+                           top="fraction vaccinated ->", 
+                           left="<- # mutations", 
+                           "nrow" = length(wt_list)))
+
+
+
+
+
+```
+
+## Concerning parameter regimes with vaccination
+
+Finally, we want to plot all plots with $T_E$, but showing how the range of parameters which result in emergence times on the order of months to years decreases and shifts with vaccination. 
+
+```{r}
+################# run for WT ########################
+### first set for FV = 0 
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+fv= 0  #portion of population vaccinated
+rho = 10^3 #introduction rate
+
+#list to store wt dfs
+wt_list = list()
+
+wt_list <- lapply(1:length(ms), function(plot) {
+ # set m and r
+  m =  ms[plot] # number of possible phenotypes
+ 
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  }
+)
+
+
+
+
+
+```
+
+
+```{r times-to-combos}
+######################### run for fv combinations
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.75,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
+f_vs = c(.05,.10,.2) #portion of population vaccinated
+rho = 10^3
+
+# combinations of parameters 
+parms.grid = expand.grid("fv" = f_vs, "m" = ms) %>% as.data.frame() 
+
+#list for storing combos
+fv_list = list()
+
+#plot for each m and r combo
+fv_list <- lapply(1:nrow(parms.grid), function(plot) {
+  # set m and r
+  m = parms.grid[plot,"m"] # number of possible phenotypes
+  fv = parms.grid[plot, "fv"] # fraction vaccinated (reduces R0 to R0(1-fv))
+  
+  # storage matrix 
+  T.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      T.E = 1/(pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i]*(1-fv), R0_2 = R0_2, Rfinal = Rfinal)*rho) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      T.Es[i,j] = T.E #add to matrix for plotting
+    }
+  }
+  
+  #format T.Es dataframe
+  T.Es = cbind(R0_1s, T.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(T.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  T.Es.long = T.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "T.Emergence"
+    )
+  }
+)
+
+```
+
+
+
+```{r }
+
+### We would like our wt_list figures to go in column 1, then the corresponding fv_list figures to follow in the next columns. 
+
+wtplots <- lapply(1:length(wt_list), function(i) {
+  plot = ggplot() + 
+    geom_tile(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+              labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE") +
+       # scale_x_continuous(limits = c(0.75, 1)) +
+    scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+     geom_contour(data = wt_list[[i]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                 breaks = c(-1,1), col = 'maroon')   +     
+    scale_fill_gradient(low = "white", high = "blue", limits = c(-1, 10))
+})
+  
+fvplots <- lapply(1:length(wt_list), function(i) {  
+    lapply((length(f_vs) - 1):0, function(j) {
+    plot2 = ggplot() + 
+      geom_tile(data = fv_list[[(3*i) - j]], aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(T.Emergence))) + 
+                labs(x = "spillover R0", y = "mutation rate", fill = "log10 TE") +
+         # scale_x_continuous(limits = c(0.75, 1)) +
+      scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+       geom_contour(data = fv_list[[(3*i) - j]], aes(x = R0, y = as.numeric(Mut.Rate), z = log10(T.Emergence)), 
+                   breaks = c(-1,1), col = 'maroon')   +     
+      scale_fill_gradient(low = "white", high = "blue", limits = c(-1, 10)) 
+    })
+})
+
+# combine all fvplots into a list
+fv_plots = do.call(c, fvplots) # combine all plots to one
+
+#empty plot list to store plots in correct order
+plots = list() 
+
+#arrange plots for grid.arrange
+plots[c(1,5,9)] = wtplots
+plots[c(2,3,4)] = fv_plots[c(1,2,3)]
+plots[c(6,7,8)] = fv_plots[c(4,5,6)]
+plots[c(10,11,12)] = fv_plots[c(7,8,9)]
+
+
+# plot panels in one figure using grid.arrange
+do.call(grid.arrange, list("grobs" = plots, 
+                           top="fraction vaccinated ->", 
+                           left="<- # mutations", 
+                           "nrow" = length(wt_list)))
+
+
+
+```
+
+
