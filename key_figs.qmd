@@ -74,21 +74,65 @@ We can also imagine different mutational landscapes...
 
 We will plot the probability of emergence and fold change in probability of emergence with vaccination and mutational landscape; the time to emergence (average) and fold change in time to emergence with vaccination and mutational landscape; and finally, plot the contours of the range of helpfulness from the time to emergence plots.  
 
-It is helpful to see how $P_Emergence$ depends on the $R_0$ of the initial spillover infection and the number of mutations required for adaptation: 
+It is helpful to see how $P_Emergence$ depends on the $R_0$ of the initial spillover infection and the number of mutations required for adaptation. Below, we plot curves for the probability of emergence of a variant spilling over with some inital $R_0$, depending on the increase in fitness gained from a mutation (`r paste("m =", ms)` gives the number of mutations required to reach an $R_0 = 1$ from an $R_0$ of 0).
 
-```{r PE_curves}
-# parameters
+```{r plotting-pE-v-R0}
+## parameters
+R0_1s = seq(0, 1, by = 0.01) #wt R0s to test
+R0_2 = 1 #R0 at which human-human transmission is achieved/end of interval
+Rfinal = 1000 #R0 of final phenotype
+ms = c(2,5, 10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mus = c(10^-3, 10^-5) #mutation rate
-R0_1s = seq(0.5,1.0, by = 0.01) #wt R0s to test
-R0_2 = 1.0 #emergence R_0
-Rfinal = 1000 #final phenotype R_0
-ms = c(5,10,20) #how many types? m-1 mutations required, meaning m-2 intermediate types
 
+### We will be creating two different sets of curves, correlating with different mutation rates. I want to store both data frames in a list. 
 
+emergence_curves = list() #storage list
 
+for(k in 1:length(mus)){ #creating a seperate dataframe, probs.emergence, for each mu
+  mu = mus[k]
+  ## matrix to store emergence probabilities 
+  probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms)) # vector to store probabilities of emergence
+  
+  ## simulate
+  for(j in 1:length(ms)){
+    for(i in 1:length(R0_1s)){
+      probs.emergence[i,j] = pEmergence_fixed(m = ms[j], mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #run simulation for each m,R0_1 combination
+    }
+  }
+  
+  ## format matrix for plotting
+  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence) = c("R0", ms) #name the columns for easy referencing
+  probs.emergence = probs.emergence %>% #pivot to long-form
+    pivot_longer(cols = !R0, #keep R0_1 column
+                 names_to = "m", #add feature denoting "m" used row-wise
+                 values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R0_1 in R0_1 column
+  
+  #add data frame to storage list 
+  emergence_curves[[k]] = probs.emergence %>% mutate("mu" = mu)
 
+}
 
+## plot
 
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+linetypes = c("solid", "dashed", "dotted")
+# plot
+plot = ggplot() + 
+  geom_line(data = emergence_curves[[1]], aes(x = R0, y = P.Emergence, group = m, col = m, linetype = as.factor(mu))) + #plot p emergence as function of R0_1 for each m
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of introduced pathogen", y = "Probability of Emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-12,1)) + #log10 y scale
+  scale_color_manual(values = my.colors, breaks = c("2", "5", "10", "20")) #because pretty
+
+for(i in 2:length(emergence_curves)){
+  plot = plot +  geom_line(data = emergence_curves[[i]], aes(x = R0, y = P.Emergence, group = m, col = m, linetype = as.factor(mu)))  #plot p emergence as function of R0_1 for each m
+}
+
+# show plot
+print(plot)
 ```
 
 
@@ -774,4 +818,110 @@ do.call(grid.arrange, list("grobs" = plots,
 
 ```
 
+
+
+
+#### schematic 
+
+```{r plotting-pE-v-R0}
+## parameters
+R0_1s = seq(0.01, 1, by = 0.01) #wt R0s to test
+R0_2 = 1.5 #R0 at which human-human transmission is achieved/end of interval
+ms = c(2, 4, 6, 8) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3#mutation rate
+
+
+  ## matrix to store emergence probabilities 
+  probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms)) # vector to store probabilities of emergence
+  
+  ## simulate
+  for(j in 1:length(ms)){
+    for(i in 1:length(R0_1s)){
+      probs.emergence[i,j] = pEmergence_additive(m = ms[j], mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2) #run simulation for each m,R0_1 combination
+    }
+  }
+  
+  ## format matrix for plotting
+  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence) = c("R0", ms) #name the columns for easy referencing
+  probs.emergence = probs.emergence %>% #pivot to long-form
+    pivot_longer(cols = !R0, #keep R0_1 column
+                 names_to = "m", #add feature denoting "m" used row-wise
+                 values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R0_1 in R0_1 column
+  
+
+
+
+## plot
+
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+linetypes = c("solid", "dashed", "dotted")
+# plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m)) + #plot p emergence as function of R0_1 for each m
+  geom_line(data = probs.emergence %>% filter(m == ms[1], R0 > 1-(0.5/3), R0 <= 1), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[2], R0 > 1-2*(0.5/3), R0 <= 1-(0.5/3)), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[3], R0 > 1-3*(0.5/3), R0 <= 1-2*(0.5/3)), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  ### adding horizontal dashed lines in powerpoint
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-15,1)) 
+
+# show plot
+print(plot)
+```
+
+
+```{r plotting-pE-v-R0}
+## parameters
+R0_1s = seq(0.01, 1, by = 0.01) #wt R0s to test
+R0_2 = 1.5 #R0 at which human-human transmission is achieved/end of interval
+ms = c(2,4, 6, 8) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3#mutation rate
+
+
+  ## matrix to store emergence probabilities 
+  probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms)) # vector to store probabilities of emergence
+  
+  ## simulate
+  for(j in 1:length(ms)){
+    for(i in 1:length(R0_1s)){
+      probs.emergence[i,j] = pEmergence_additive(m = ms[j], mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2) #run simulation for each m,R0_1 combination
+    }
+  }
+  
+  ## format matrix for plotting
+  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence) = c("R0", ms) #name the columns for easy referencing
+  probs.emergence = probs.emergence %>% #pivot to long-form
+    pivot_longer(cols = !R0, #keep R0_1 column
+                 names_to = "m", #add feature denoting "m" used row-wise
+                 values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R0_1 in R0_1 column
+  
+
+
+
+## plot
+
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+linetypes = c("solid", "dashed", "dotted")
+# plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m), col = "chite") + #plot p emergence as function of R0_1 for each m
+  geom_line(data = probs.emergence %>% filter(m == ms[1], R0 > 1-(1/length(ms)), R0 <= 1), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[2], R0 > 1-2*(1/length(ms)), R0 <= 1-(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[3], R0 > 1-3*(1/length(ms)), R0 <= 1-2*(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[4], R0 > 1-4*(1/length(ms)), R0 <= 1-3*(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  ### adding horizontal dashed lines in powerpoint
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of introduced pathogen", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-15,1)) 
+
+# show plot
+print(plot)
+```
 
