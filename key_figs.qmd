@@ -827,7 +827,55 @@ do.call(grid.arrange, list("grobs" = plots,
 ## parameters
 R0_1s = seq(0.01, 1, by = 0.01) #wt R0s to test
 R0_2 = 1.5 #R0 at which human-human transmission is achieved/end of interval
-ms = c(2, 4, 6, 8) #how many types? m-1 mutations required, meaning m-2 intermediate types
+ms = c(2, 3, 4, 5) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3#mutation rate
+
+
+  ## matrix to store emergence probabilities 
+  probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ms)) # vector to store probabilities of emergence
+  
+  ## simulate
+  for(j in 1:length(ms)){
+    for(i in 1:length(R0_1s)){
+      probs.emergence[i,j] = pEmergence_additive(m = ms[j], mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2) #run simulation for each m,R0_1 combination
+    }
+  }
+  
+  ## format matrix for plotting
+  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence) = c("R0", ms) #name the columns for easy referencing
+  probs.emergence = probs.emergence %>% #pivot to long-form
+    pivot_longer(cols = !R0, #keep R0_1 column
+                 names_to = "m", #add feature denoting "m" used row-wise
+                 values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R0_1 in R0_1 column
+  
+
+
+
+## plot
+
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+linetypes = c("solid", "dashed", "dotted")
+# plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m)) + #plot p emergence as function of R0_1 for each 
+  ### adding horizontal dashed lines in powerpoint
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of first infection", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-7,1)) 
+
+# show plot
+print(plot)
+```
+
+
+```{r plotting-pE-v-R0}
+## parameters
+R0_1s = seq(0.01, 1, by = 0.01) #wt R0s to test
+R0_2 = 1.5 #R0 at which human-human transmission is achieved/end of interval
+ms = c(2, 3, 4, 5) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3#mutation rate
 
 
@@ -863,11 +911,12 @@ plot = ggplot() +
   geom_line(data = probs.emergence %>% filter(m == ms[1], R0 > 1-(0.5/3), R0 <= 1), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   geom_line(data = probs.emergence %>% filter(m == ms[2], R0 > 1-2*(0.5/3), R0 <= 1-(0.5/3)), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   geom_line(data = probs.emergence %>% filter(m == ms[3], R0 > 1-3*(0.5/3), R0 <= 1-2*(0.5/3)), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
+  geom_line(data = probs.emergence %>% filter(m == ms[4], R0 > 1-4*(0.5/3), R0 <= 1-3*(0.5/3)), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   ### adding horizontal dashed lines in powerpoint
   theme_bw() + #white background with grey gridlines
-  labs(x = "R0 of introduced pathogen", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  labs(x = "R0 of first infection", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
   scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
-  scale_y_continuous(trans = "log10", limits = c(10^-15,1)) 
+  scale_y_continuous(trans = "log10", limits = c(10^-7,1)) 
 
 # show plot
 print(plot)
@@ -878,7 +927,7 @@ print(plot)
 ## parameters
 R0_1s = seq(0.01, 1, by = 0.01) #wt R0s to test
 R0_2 = 1.5 #R0 at which human-human transmission is achieved/end of interval
-ms = c(2,4, 6, 8) #how many types? m-1 mutations required, meaning m-2 intermediate types
+ms = c(2,3, 4, 5) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3#mutation rate
 
 
@@ -910,14 +959,14 @@ my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #becaus
 linetypes = c("solid", "dashed", "dotted")
 # plot
 plot = ggplot() + 
-  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m), col = "chite") + #plot p emergence as function of R0_1 for each m
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence, group = m), col = "white") + #plot p emergence as function of R0_1 for each m
   geom_line(data = probs.emergence %>% filter(m == ms[1], R0 > 1-(1/length(ms)), R0 <= 1), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   geom_line(data = probs.emergence %>% filter(m == ms[2], R0 > 1-2*(1/length(ms)), R0 <= 1-(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   geom_line(data = probs.emergence %>% filter(m == ms[3], R0 > 1-3*(1/length(ms)), R0 <= 1-2*(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   geom_line(data = probs.emergence %>% filter(m == ms[4], R0 > 1-4*(1/length(ms)), R0 <= 1-3*(1/length(ms))), aes(x = R0, y = P.Emergence, group = m), col = "red", size = 2) +
   ### adding horizontal dashed lines in powerpoint
   theme_bw() + #white background with grey gridlines
-  labs(x = "R0 of introduced pathogen", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  labs(x = "R0 of first infection", y = "Probability of emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
   scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
   scale_y_continuous(trans = "log10", limits = c(10^-15,1)) 
 
