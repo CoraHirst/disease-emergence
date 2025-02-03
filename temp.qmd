@@ -1,0 +1,8 @@
+---
+title: "temp"
+format: html
+editor: visual
+---
+
+For the evenly dispersed scenario: 
+The number of secondary infections of type $i$ from an infection of type $i$ is poisson-distributed with mean  $(1-\mu)R_0^i$, and the number of secondary infections of type $i+1$ from an infection of type $i$ is poisson-distributed with a mean $\mu R_0^i$. The total number of secondary cases caused by an infection is poisson distributed with a mean of $R_0^i$ (useful for generating function of the $m_{th}$ type.)

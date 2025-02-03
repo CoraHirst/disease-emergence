@@ -136,7 +136,7 @@ print(plot)
 ```
 
 
-Below, we plot the dependence of $P_{emergence}$ on $\mu$ and $R0_1$, given different combinatons of $m$ and $f_v$. 
+Below, we plot the dependence of $P_{emergence}$ on $\mu$ and $R0_1$, given different combinations of $m$ and $f_v$. 
 
 
 ```{r Pemergence-heatmaps}
@@ -973,4 +973,103 @@ plot = ggplot() +
 # show plot
 print(plot)
 ```
+
+
+# single figures
+
+```{r}
+## parameters
+R0_1s = seq(0, 1, by = 0.01) #wt R0s to test
+R0_2 = 1 #R0 at which human-human transmission is achieved/end of interval
+Rfinal = 1000 #R0 of final phenotype
+m = 5 #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3 #mutation rate
+
+
+
+  ## matrix to store emergence probabilities 
+  probs.emergence = NaN # vector to store probabilities of emergence
+  
+  ## simulate
+  
+    for(i in 1:length(R0_1s)){
+      probs.emergence[i] = pEmergence_fixed(m = m, mu = mu, R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #run simulation for each m,R0_1 combination
+    }
+  
+  ## format matrix for plotting
+  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #format as dataframe with column denoting the R0_1 used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence) = c("R0", "P.Emergence") #name the columns for easy referencing
+ 
+  
+
+
+## plot
+
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+linetypes = c("solid", "dashed", "dotted")
+# plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence, aes(x = R0, y = P.Emergence)) + #plot p emergence as function of R0_1 for each m
+  theme_bw() + #white background with grey gridlines
+  labs(x = "R0 of introduced pathogen", y = "Probability of Emergence", title = "probability of emergence with m phenotypes") + #axis and title labels
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  scale_y_continuous(trans = "log10", limits = c(10^-12,1))  #log10 y scale
+  
+
+# show plot
+print(plot)
+
+
+```
+
+
+
+```{r}
+# parameters
+mus = 10^seq(-6,-3, by = 0.1) #mutation rate
+R0_1s = seq(0.01,1.0, by = 0.01) #wt R0s to test
+R0_2 = 1.0 #emergence R_0
+Rfinal = 1000 #final phenotype R_0
+m = 5 #how many types? m-1 mutations required, meaning m-2 intermediate types
+
+# storage matrix 
+  P.Es = matrix(nrow = length(R0_1s), ncol = length(mus)) #store times to emergence for each R0_1/mu pair
+  
+  # calculate delta ps
+  for(i in 1:length(R0_1s)){
+    for(j in 1:length(mus)){
+    ## wild-type probability
+      P.E = pEmergence_fixed_evenlydispersed(m = m, mu = mus[j], R0_1 = R0_1s[i], R0_2 = R0_2, Rfinal = Rfinal) #calculated emergence probability for each combinations
+    
+     # add solution to matrix
+      P.Es[i,j] = P.E #add to matrix for plotting
+    }
+  }
+  
+  #format P.Es dataframe
+  P.Es = cbind(R0_1s, P.Es) %>% as.data.frame() #dataframe with R0s column
+  colnames(P.Es) = c("R0", mus) #column names for referencing
+  
+  #long-form 
+  P.Es.long = P.Es %>%
+    pivot_longer(
+      cols = !R0, 
+      names_to = "Mut.Rate",
+      values_to = "P.Emergence"
+    )
+  
+  # plot heatmap 
+  plot = ggplot() + 
+          geom_tile(data = P.Es.long, aes(x = R0, y = as.numeric(Mut.Rate), fill = log10(P.Emergence))) + 
+          labs(x = "spillover R0", y = "mutation rate", fill = "log10 PE") +
+   # scale_x_continuous(limits = c(0.75, 1)) +
+         scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue", limits = c(-15, 0)) 
+  plot
+
+
+```
+
+ 
 
