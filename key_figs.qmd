@@ -128,7 +128,7 @@ plot = ggplot() +
   scale_color_manual(values = my.colors, breaks = c("2", "5", "10", "20")) #because pretty
 
 for(i in 2:length(emergence_curves)){
-  plot = plot +  geom_line(data = emergence_curves[[i]], aes(x = R0, y = P.Emergence, group = m, col = m, linetype = as.factor(mu)))  #plot p emergence as function of R0_1 for each m
+  plot = plot +  geom_line(data = emergence_curves[[i]], aes(x = R0, y = P.Emergence, group = m, col = m, linetype = as.factor(mu)), lwd = 1.25)  #plot p emergence as function of R0_1 for each m
 }
 
 # show plot
