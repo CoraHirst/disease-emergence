@@ -1,0 +1,562 @@
+---
+title: "Homework 3: Genetic Drift, part 1"
+subtitle: "Population and Quantitative Genetics Spring 2025"
+format: pdf
+execute:
+  echo: false
+  warning: false
+
+---
+
+## 1) In a population of $N$ diploid individuals, let $C_0$ be the count of $A_1$ alleles in the current generation. If you reach into the population and pick a single allele at random, what is the probability that allele will be an $A_1$ allele?
+
+In $N$ diploid individuals, there will be $2N$ alleles, accounting for each individual's two alleles. 
+The probability of picking an $A_1$ allele out of the $2N$ alleles in the population is thus equal to the proportion of the $2N$ alleles that are $A_1$, giving a probability $\frac{C_0}{2N}$ of selecting $A_1$. 
+
+## 2) [Wright-Fisher sampling]. Following from problem 1, if you create the next generation by reaching into the current generation, and picking $2N$ alleles at random with replacement, and $C_1$ is the count of $A_1$ alleles next generation, what is the probability that $C_1$ equals $i$ for arbitrary values of $i, \ 0 \le i \le 2N$. Express $Prob(C_1=i)$ in terms of $C_0$ and $N$.
+
+Let us consider the number of $A_1$ alleles randomly selected out of $2N$ alleles from generation $0$ as the sum of $2N$ independent Bernoulli random variables with outcomes $X = 1$ being the selection of an $A_1$ allele and $X = 0$ being the selection of an $A_2$ allele. 
+
+The common mean of the Bernoulli random variables turns out to be the probability of outcome $X = 1$, or "success", which we've observed before and as demonstrated below: 
+
+$$
+E(X) = \sum_{i = 1}^2 X_ip_i = (1)(p_1) + (0)(p_2) 
+$$
+$$
+= p_1
+$$
+Here, the probability of outcome $X=1$ is the probability of sampling one $A_1$ allele from $2N$ alleles, which we've shown to be $\frac{C_0}{2N}$. 
+
+Taken together, the probability of selecting $C_1 = i$ $A_1$ alleles out of $2N$ total choices to create generation $1$ for arbitrary $i$ between $0$ and $2N$ is thus the same as the probability of $i$ successes in $2N$ Bernoulli trials, where the probability of a success on a given trial is the common mean $\frac{C_0}{2N}$. 
+
+**Binomial distribution:**
+
+For there to be $i$ successes from $2N$ trials, we need to find the probability of $i$ successes and $2N-i$ failures. This is equal to the product of the probability of a success $i$ times and the probability of a failure $2N-i$ times, which gives $(\frac{C_0}{2N})^i (1-\frac{C_0}{2N})^{2N-i}$. 
+
+However, there are a number of different ways of ordering $i$ successes and $2N-i$ failures given $2N$ trials. This is given by the binomial coefficient, ${2N}\choose{i}$, meaning we must add the probability of $(\frac{C_0}{2N})^i (1-\frac{C_0}{2N})^{2N-i}$ to itself $2N \choose i$ times to account for the total probability of generating this number of successes and failures in $2N$ trials. 
+
+The probability that our random count variable $C_1 = i$ is thus:
+
+$$
+Prob(C_i = i) = \binom{2N}{i} (\frac{C_0}{2N})^i (1-\frac{C_0}{2N})^{2N-i}
+$$
+
+## 3) What is $E(C_1)$ and $Var(C_1)$?
+
+**Expectation**
+
+Because we can consider the number of $A_1$ alleles randomly selected out of $2N$ alleles from generation $0$ as the sum of $2N$ independent Bernoulli random variables with common mean $\frac{C_0}{2N}$, our expectation for the sum $C_1$ will be: 
+
+$$
+E(C_1) = E(X_{1} +  X_{2} +  X_{3} + ... + X_{2N})
+$$
+
+Where $X_i$ is the random Bernoulli variable that represents the $ith$ selection. 
+
+Given the linearity of the expectation operator, this becomes $E(C_1) = E(X_{1}) +  E(X_{2}) +  E(X_{3}) + ... + E(X_{2N})$, which gives $E(C_1) = 2N \frac{C_0}{2N}$. This simplifies to
+
+$$
+E(C_1) = C_0,
+$$
+or the number of $A_1$ alleles in generation $0$.
+
+**Variance**
+
+The variance of the sum $C_1$ will be $2N(\frac{C_0}{2N}(1- \frac{C_0}{2N}))$, which simplifies to 
+
+$$
+C_0(1- \frac{C_0}{2N})
+$$
+
+This is the count of the $A_1$ allele in generation 0 multiplied by the frequency of the other allele. The variance is greatest when $C_0$ is N and $C_0/2N = 0.5$
+
+## 4) In that same population, let $p_0 = C_0 / 2N$ be the frequency of $A_1$ in the current generation, and $p_1$ is the frequency of $A_1$ in the next generation. What is the probability that $p_1 = x$, for arbitrary values of $0 \le x \le 1$. Express $Prob(p_1=x)$ in terms of $p_0$ and $N$. 
+
+$p_1$ is the frequency of $A_1$ alleles in the next generation, meaning $p_1 = C_1/2N$. Thus, we are looking for the probability $Prob(C_1 = 2Nx)$. 
+
+We have previously described the probability of the *count* of $C_1$ alleles being some integer from $1$ to $2N$ as a binomial distribution with mean $C_0$, or the count of alleles in the previous generation. The probability of $p_1 = x$ for arbitrary $x$ between $0$ and $1$ is simply $Prob(p_1 = x) = Prob(C_1 = 2Nx) = \binom{2N}{2Nx}  (\frac{p_02N}{2N})^{2Nx} (1-\frac{p_02N}{2N})^{2N(1-x)}$, or simply 
+
+$$
+Prob(p_1 = x) = \binom{2N}{2Nx}  (p_0)^{2Nx} (1-p_0)^{2N(1-x)}.
+$$ 
+
+But of course, we run into the beautiful problem that a binomial distribution is *discrete*. $C_1$ must be a whole integer (we don't have fractions of alleles) and thus $p_0$ and $p_1$ will only take non-zero values from the set of $x$ in $\{0, \frac{1}{2N}, \frac{2}{2N}, ... , \frac{2N}{2N} \}$ (that is, $2Nx \text{ in } \{1,2,..., 2N\}$). 
+
+## 5) What is $E(p_1)$ and $Var(p_1)$?
+
+We know that $p_1$ is $C_1/2N$, meaning the expected value $E(p_1) = E(\frac{C_1}{2N})$. Because $1/2N$ is a scalar and $E()$ is a linear operator, the expected value $E(p_1) = E(\frac{C_1}{2N})$ would simplify to $E(p_1) = \frac{1}{2N}E(C_1)$. 
+
+As we know $E(C_1) = C_0$, 
+
+$$
+E(p_1) = \frac{C_0}{2N} = p_0.
+$$
+
+Just as the expected count in the next generation stays the same as the count in the current generation, the expected frequency stays the same as the frequency of the current generation.
+
+
+The variance $Var(p_1) = Var(\frac{C_1}{2N})$. While variance is not a linear operator, we can pull the common factor $((\frac{1}{2N})^2)$ resulting from scalar multiplication of the random variables outside of the operation, such that $Var(p_1) = (\frac{1}{2N})^2Var(C_1)$. 
+
+As we found $Var(C_1) = C_0(1- \frac{C_0}{2N})$, 
+
+$$
+Var(p_1) = (\frac{1}{2N})^2 C_0(1- \frac{C_0}{2N}) = \frac{p_0(1-p_0)}{2N}
+$$
+
+This is the product of the frequencies of the two alleles divided by the total number of alleles. As the population size increases, the variance decreases (which tells us something about the stability of population structure through time under neutral conditions for large populations and, alternatively, that it may be hard to infer neutral drift for small populations.) Similar to the previous problem, the variance is greatest when $p_0 - p_0^2$ is maximized, or at $p_0 = 0.5$.
+
+## 6) Let $p_2$ be the frequency of the $A_1$ allele in the following generation. What is the $Prob(p_2=y)$ in terms of $p_0$ and $N$. Hint: Your solution is likely to have a very nasty looking summation in it that doesn’t simplify.
+
+To reach the frequency of the allele $A_1$ in generation $2$ from generation $0$, we must first identify the probability of each possible outcome for the allele frequencies in generation $1$, and find the sum of all possible outcomes for generation $2$ given the possible outcomes of generation $1$. 
+
+In essence, this looks like 
+
+$$
+Prob(p_2 = y) = \sum Prob(p_2 = y)|p_1 = x)*Prob(p_1 = x)
+$$
+for all $x$ and $y$ in the set $\{0, \frac{1}{2N}, \frac{2}{2N}, ... , \frac{2N}{2N} \}$. 
+
+This works out to be: 
+
+$$
+Prob(p_2 = y) = \sum \binom{2N}{2Ny}x^{2Ny}(1-x)^{2N(1-y)} * \binom{2N}{2Nx} p_0^{2Nx}(1-p_0)^{2N(1-x)}
+$$
+With $i = 2Nx$ and $j = 2Ny$, we can write this as: 
+
+$$
+Prob(p_2 = \frac{j}{2N}) = \sum_{i = 1}^{2N} \sum_{j=1}^{2N} \binom{2N}{j}(\frac{i}{2N})^{j}(1-\frac{i}{2N})^{2N-j} * \binom{2N}{i} p_0^{i}(1-p_0)^{2N-i}
+$$
+and the conditional probabilities $P_{i,j} =\binom{2N}{j}(\frac{i}{2N})^{j}(1-\frac{i}{2N})^{2N-j}$
+
+
+## 7) Write down an expression for E{p2}. Do you know what this simplifies to? It may be too much algebra to prove it, but guess if you can’t prove it. What is the E{pk} where k is any arbitrary number of generations in the future?
+
+Our expectation from $p_2$ would be the expectation $E(E(p_2|p_1))$. As the $E(p_1|p_0)$ in our initial random sampling process gave us $p_0$, and we follow the same random sampling process from $p_1$ to $p_2$, we expect that $E(p_2|p_1) = p_1$. 
+
+This is a wonderful result that suggests $E{p_2} = E{p_1} = p_0$. 
+
+As each generation follows the same random sampling process, we suspect that that $E(p_k) = p_0$.
+
+## 8) Write down an expression for $Var(p_2)$. Can you simplify it? Can you solve or guess $Var(p_k)$?
+
+$Var(p_2) = E(Var(p_2|p_1)) + Var(E(p_2|p_1))$
+
+**For $Var(E(p_2|p_1))$**:
+
+We have already shown (at the very least, guessed) that $E(p_2|p_1) = p_1$, so 
+
+$$
+Var(E(p_2|p_1)) = Var(p_1) = \frac{p_0(1-p_0)}{2N}.
+$$
+
+
+**For $E(Var(p_2|p_1))$**:
+
+We know $Var(p_2|p_1 = x) = \frac{x(1-x)}{2N}$, so, our $E(Var(p_2|p_1))$ would be $E(\frac{p1(1-p1)}{2N})$. 
+
+Expanded, this gives 
+
+$$
+E(Var(p_2|p_1)) = E(\frac{p1(1-p1)}{2N}) = E(\frac{p_1}{2N}) - E(\frac{p_1^2}{2N}) = \frac{1}{2N}(E(p_1)-E(p_1^2))
+$$
+
+
+We know that $Var(p_1) = E(p_1^2) - E(p_1)^2$, so $E(p_1^2) = Var(p_1) + E(p_1)^2$. This substitution of $E(p_1^2)$ gives
+
+$$
+E(Var(p_2|p_1)) = \frac{1}{2N}(E(p_1)-E(p_1^2)) = \frac{1}{2N}(p_0 - Var(p_1) - E(p_1)^2), 
+$$
+
+such that 
+
+$$
+E(Var(p_2|p_1)) = \frac{1}{2N}(p_0 - \frac{p_0(1-p_0)}{2N} - p_0^2)
+$$
+
+** For $Var(p_2) = E(Var(p_2|p_1)) + Var(E(p_2|p_1))$ :**
+
+$$
+Var(p_2) = \frac{1}{2N}(p_0 - \frac{p_0(1-p_0)}{2N} - p_0^2 + p_0(1-p_0))
+$$
+
+$$
+= \frac{1}{2N}(2(p_0(1-p_0) - \frac{p_0(1-p_0)}{2N})
+$$
+
+$$
+= \frac{p_0(1-p_0)}{2N}(2 - \frac{1}{2N})
+$$
+
+Now I saw the variance formula in *McKay and Falconer* and I've been banging my head trying to figure out how this comes from that, and then I remembered that I'm in a physics department and everyone in physics loves completing the square. 
+
+** Reverting to general formula form **
+
+$$
+\frac{p_0(1-p_0)}{2N}(2 - \frac{1}{2N}) = p_0(1-p_0)(\frac{2}{2N} - (\frac{1}{2N})^2) = p_0(1-p_0)(1 - (1 - \frac{2}{2N} + (\frac{1}{2N})^2)
+$$
+
+$$
+Var(p_2) = p_0(1-p_0)(1 - (1 - \frac{1}{2N})^2)
+$$
+
+Why not try to derive this variance formula? 
+
+**Deriving allele frequency variance formula for Fisher Wright sampling after $k$ generations**
+
+$$
+Var(C_t) = E(C_t^2) - Var(C_t)^2
+$$
+
+
+
+## 9) Defining everything as in Problem 1, let $p_0 = 1/2N$. What is the $Pr(p_1>0)$?.
+
+
+The probability that $p_1 > 0 $ is the complement of the extinction probability, or $1 - prob(p_1 = 0)$. 
+
+$$
+Prob(p_1 = 0) = \binom{2N}{0}  (\frac{1}{2N})^{0} (1-\frac{1}{2N})^{2N}.
+$$
+
+Therefore, 
+
+$$
+Pr(p_1 > 0)= 1 - (1-\frac{1}{2N})^{2N}
+$$
+
+## 10) Under Wright-Fisher sampling in a very large population (N large), what fraction of the population leave no descendants each generation? Hint: Problem 10 comes immediately after Problem 9.
+
+As $N$ gets large, 
+
+$$
+\lim_{N \to \infty} (1-\frac{1}{2N})^{2N} = \lim_{N \to \infty} (1+\frac{-1}{2N})^{2N} = e^{-1}
+$$
+
+This is approximately 37% of the population. 
+
+## 11) All conditions as in problem 1. What is the probability that two randomly picked alleles are identical by state? What is the probability that they differ by state.
+
+The probability of picking two alleles of the same state is the $Prob(A1|A1) + Prob(A2|A2)$. Because the selections are independent (assuming replacement), the covariance between the selections is 0 and thus 
+
+$$
+Prob(homozygote) = p_0^2 + (1-p_0)^2 = 1 - 2p_0(1-p_0)
+$$
+
+Which makes the probability of selecting two different state alleles
+
+$$
+Prob(heterozygote) = 2p_0(1-p_0)
+$$
+
+We can treat these as our initial probabilities of sampling homo/heterozygotes: 
+
+  1) $H_0 = 2p_0(1-p_0)$
+  2) $1 - H_0 = 1 - 2p_0(1-p_0)$
+  
+  Where H_0 is the probability of selecting heterozygotes from the initial population conditions. 
+
+## 12) All conditions as in problem 11. In the absence of mutation, what is the expected probability that two randomly picked alleles are identical by state k generations later. What is the probability they differ by state.
+
+The change in $G$, the probability of picking two alleles picked at random are identical by state, in the next generation would be:
+
+$$
+G_1 = \frac{1}{2N} + (1- \frac{1}{2N})G_0
+$$
+
+$G_0$ is $1 - 2p_0(1-p_0)$, the probability of selecting two of the same alleles by state given our initial conditions. 
+
+and in the following generation, 
+
+$$
+G_2 = \frac{1}{2N} + (1- \frac{1}{2N})G_1 =  \frac{1}{2N} + (1- \frac{1}{2N})(\frac{1}{2N} + (1- \frac{1}{2N})G_0)
+$$
+
+This is a recursive function that I don't particularly like. But we can see if the heterozygote frequency at generation k is an easier recursive function: 
+
+$$
+H_1 = 1- G_1 = 1 - (\frac{1}{2N} + (1- \frac{1}{2N})(1-H_0))
+$$
+which becomes 
+
+$$
+H_1 = 1 - \frac{1}{2N} - (1 - H_0 - \frac{1}{2N} + \frac{H_0}{2N}) = H_0(1 - \frac{1}{2N})
+$$
+
+and in the next generation, 
+
+$$
+H_2 = 1 - G_2 = H_1 (1 - \frac{1}{2N}) = H_0(1 - \frac{1}{2N})^2
+$$
+and this follows for 
+
+$$
+H_{t+1} = H_0(1 - \frac{1}{2N})^t
+$$
+
+So, at generation $k$ for our initial conditions: 
+
+$$
+H_{k} = 2p_0(1-p_0)(1 - \frac{1}{2N})^{k-1}
+$$
+and 
+
+$$
+G_k = 1 - 2p_0(1-p_0)(1 - \frac{1}{2N})^{k-1}
+$$
+
+## 13) What is the difference in heterozygosity between generation k and generation k+1?
+
+The difference in heterozygosity from generation $k$ to generation $k+1$ is given by: 
+
+$$
+H_{k+1} - H_{k} = H_0(1-\frac{1}{2N})^{k+1} - H_0(1-\frac{1}{2N})^{k}
+$$
+
+factoring $H_0(1-\frac{1}{2N})^k$ gives $H_0(1-\frac{1}{2N})^k(1-\frac{1}{2N} - 1)$. Thus, we can see that the difference in heterozygosity from generation k to generation k+1 simplifies to:
+
+$$
+\Delta H = -\frac{1}{2N}H
+$$
+
+Demonstrating the exponential decay of heterozygotes at a rate of $\frac{1}{2N}$.
+
+## 14) In a diploid population of size 100, and current heterozygosity of 0.99, and all conditions as in problem 13, plot the expected heterozygosity over the course of the next 1000 generations.
+
+```{r q14}
+#define heterozygosity function
+H_t = function(t) {H_0*(1-(1/(2*N)))^t}
+
+#parameters
+H_0 = 0.99
+N = 100
+
+#plot 
+curve(log10(H_t(x)), from = 0, to = 1000, xlab = "generations", ylab = "log10(H_t)")
+
+ 
+```
+
+Linear on a log-linear scale, with generation scale $\mathcal O(N)$.
+
+
+## 15) Consider an infinite population (N = infinity, no genetic drift) with current heterozygosity 0.01, and with a mutation rate to completely new alleles (not previously seen in the population) of 0.01 per generation. Plot the expected heterozygosity over the course of the next 1000 generation. (Excel or R might be useful).
+
+Heterozygosity in generation $k$ considering a constant very small mutation rate and large population sizes, approximates to:
+
+$$
+H_{k} = H_{k-1} + (1-H_{k-1})(1-(1-\mu)^2)
+$$
+
+
+```{r q15}
+
+#define heterozygosity function
+H_prime = function(H) {H + (1-H)*(1-(1-mu)^2)}
+
+#parameters
+mu = 10^-2 #mutation rate
+gens = 10^3 #number of generations to simulate
+
+#initial conditions
+H_0 = 0.01 #initial heterozygosity
+
+#matrix to store gentotype frequencies in 
+heterozygosity = matrix(nrow = gens, ncol = 2) #rows=generations, cols = generation, heterozygosity
+
+#initialize
+heterozygosity[1,] = c(0,H_0)
+
+#simulate
+for(i in 2:gens){
+  heterozygosity[i,] = c(i, H_prime(heterozygosity[i-1,2]))
+}
+
+#plot
+plot(x = heterozygosity[,1], y = heterozygosity[,2])
+
+```
+
+## 16) Now consider a finite population of size N with mutation rate to new alleles $\mu$ and current heterozygosity H. What is the expected heterozygosity next generation?
+
+The change in heterozygosity from one generation to the next, $\Delta \mathcal H$ would be the sum of the change due to drift (negative and exponential) and the change due to mutation (linear terma and exponential term.) Thus:
+
+$$
+\Delta \mathcal H = -\frac{1}{2N} \mathcal H + 2\mu(1-\mathcal H)
+$$
+As such, the expected heterozygosity next generation would be: 
+
+$$
+\mathcal H_{k+1} = \mathcal H_{k} -\frac{1}{2N} \mathcal H + 2\mu(1-\mathcal H) = (1 -\frac{1}{2N}) \mathcal H_{k} + 2\mu(1-\mathcal H)
+$$
+
+## 17) Consider a diploid population of size 100, with current heterozygosity of 0.9 and a mutation rate of 0.01 per generation. Plot the expected heterozygosity over the course of the next 1000 generations. 
+
+```{r q17}
+#expected heterozygosity
+H_prime = function(H){
+  H_prime = (1- (1/(2*N)))*H + 2*mu*(1-H) #change due to drift + change due to mutation
+}
+
+#parameters
+mu = 0.01 #mutation rate
+N = 100 #population size
+gens = 1000 #generations to simulate
+
+#initial conditions
+H_0 = 0.9#initial heterozygosity
+
+#matrix to store heterozygosities
+heterozygosity = matrix(nrow = gens, ncol = 2) #row = generation, col = generation, heterozygosity
+
+# initialize
+heterozygosity[1,] = c(0, H_0)
+
+#simulate
+for(i in 2:gens){
+  heterozygosity[i,] = c(i, H_prime(heterozygosity[i-1,2]))
+}
+
+#plot
+plot(x = heterozygosity[,1], y = heterozygosity[,2], ylim = c(0,1))
+  abline(h = 4*N*mu/(1 + 4*N*mu), lty = 2, col = "red") #equilibrium heterozygosity
+
+```
+
+## 18) Consider a diploid population of size 100, with current heterozygosity of 0.01, and with a mutation rate to new alleles of 0.01 per generation. Plot the expected heterozygosity over the course of the next 1000 generations (Excel or R might be useful).
+
+The equilibrium heterozygosity does not depend on the initial heterozygosity:
+
+```{r q18}
+#expected heterozygosity
+H_prime = function(H){
+  H_prime = (1- (1/(2*N)))*H + 2*mu*(1-H) #change due to drift + change due to mutation
+}
+
+#parameters
+mu = 0.01 #mutation rate
+N = 100 #population size
+gens = 1000 #generations to simulate
+
+#initial conditions
+H_0 = 0.01 #initial heterozygosity
+
+#matrix to store heterozygosities
+heterozygosity = matrix(nrow = gens, ncol = 2) #row = generation, col = generation, heterozygosity
+
+# initialize
+heterozygosity[1,] = c(0, H_0)
+
+#simulate
+for(i in 2:gens){
+  heterozygosity[i,] = c(i, H_prime(heterozygosity[i-1,2]))
+}
+
+#plot
+plot(x = heterozygosity[,1], y = heterozygosity[,2], ylim = c(0,1))
+  abline(h = 4*N*mu/(1 + 4*N*mu), lty = 2, col = "red") #equilibrium heterozygosity
+
+```
+
+## 19) What is the expected homozygosity at equilibrium? 
+
+The expected homozygosity at equilibrium should be $\hat{\mathcal G} = 1 - \hat{\mathcal H} = 1 - \frac{4N\mu}{1+4N\mu}$, which give:
+
+$$
+\hat{\mathcal G} = 1 - \frac{4N\mu}{1+4N\mu} = 1 - \frac{4(100)(0.01)}{1 + 4(100)(0.01)} = 1 - \frac{4}{5} = 0.2
+$$
+## 20) In a Wright-Fisher population of size 12,500 diploid individuals, you observe a protein with heterozygosity 0.1. Estimate the mutation rate at this locus, assuming the population has been at constant size for a very long time.
+
+We assume that the mutation rate is constant and there is no force of evolution happening at this locus other than drift (reducing heterozygosity) and mutation (increasing heterozygosity.) 
+
+If the population has been at a constant size for a long time, we can also assume that the dynamics of these apposing forces have reached an equilibrium, such that 
+
+$$
+\hat{\mathcal H} = 0.1 = \frac{4N\mu}{1+4N\mu} 
+$$
+as $N = 12500$, we can solve for $\mu$:
+
+$$
+10 = \frac{1}{4N\mu} + 1
+$$
+$$
+\frac{1}{36N} = \mu = 2.2 \times 10^{-6}
+$$
+
+## 21) You sequence a single diploid individual at 3 billion single nucleotides. You observe this individual is a heterozygote at 3,000,000 of these sites, and homozygous at the rest. Suppose you know from other sources that the average mutation rate is $10^{-8}$ per base per generation. Estimate the population size this single individual was drawn from, assuming the individual came from a constant size population.
+
+We can use this individual's genome as a proxy for the heterozygosity of the population, assuming mutations are equally likely to happen at any part of the genome and all loci can be selected for the next individual independently and with equal probability. 
+
+The equilibrium heterozygosity is $\hat{\mathcal H} = \frac{3 \times 10^6}{3 \times 10^9} = 10^{-3}$. The mutation rate is given as $10^{-8}$ per base per generation. Solving $\hat{\mathcal H} = 0.1 = \frac{4N\mu}{1+4N\mu}$ for the population size: 
+
+$$
+\hat{\mathcal H} = 10^{-3} = \frac{4N\times10^{-8}}{1+ (4N\times 10^{-8})} 
+$$
+$$
+10^3 - 1 \approx 10^3 = \frac{10^8}{4N}
+$$
+$$
+N = \frac{1}{4}10^5 = 2.5 \times 10^4
+$$
+
+
+$$
+N = \mathcal O(10^4)
+$$
+That's a small city or a late stage bronze age civilization. cool.
+
+
+## 22) Formula 2.9 in Gillespie’s book is an approximation. Find the exact solution for the equilibrium value of H. Compare this exact solution to the approximation given in 2.9 for {μ = 0.1, N = 10}, {μ = 0.1, N = 1000}, {μ = 0.001, N = 10}, and {μ = 0.001, N = 1000}. Which parameter makes a bigger difference in the approximation? Is the approximation ``good enough'' for you?
+
+
+Simplified: 
+
+$$
+\mathcal G' = G((\mu^2 - 1)(1-\frac{1}{2N})) + \frac{\mu}{N}(\frac{mu}{2} -1) + \frac{1}{2N}
+$$
+
+$$
+\mathcal H' = 1 - \mathcal G' = 1 - (1-H)((\mu^2 - 1)(1-\frac{1}{2N})) + \frac{\mu}{N}(\frac{mu}{2} -1) + \frac{1}{2N}
+$$
+
+$$
+\mathcal H' =  1 - (1-H)((\mu^2 - 1)(1-\frac{1}{2N})) - \frac{\mu}{N}(\frac{\mu}{2} -1) - \frac{1}{2N}
+$$
+
+Thus, $\mathcal H$ is at equilibrium when 
+
+```{r q22}
+library(tidyverse)
+library(dplyr)
+# functions 
+
+exact_hhat = function(N,mu) {-1*(1/((mu^2 -1)*(1-(1/(2*N))) -1) * ((mu/N)*((mu/2) - 1)) + 1/(2*N) + (mu^2 - 1)*(1-(1/(2*N))))}
+approximate_hhat = function(N,mu) {4*N*mu/(1 + 4*N*mu)}
+
+# parameters 
+mus = c(0.1, 0.1,0.001, 0.001)
+Ns = c(10, 1000, 10, 1000)
+
+# compare
+df = data.frame(mus = mus, Ns = Ns)
+df = df %>% mutate("approx" = approximate_hhat(N = Ns, mu = mus), "exact" = exact_hhat(N = Ns, mu = mus))
+
+print(df)
+
+```
+
+
+## 23) Consider a single locus with two alleles and no mutation. Let p0 = 1/2N, i.e. assume that the A1 exists in only a single copy. What is the current heterozygosity, H0 of the population? After a very large number of generations, what is the expected heterozygosity of the population?
+
+IF the A1 allele exists only in a single copy, and there are only two alleles at the locus, then one individual out of N must be heterozygous, such that $H_0$ = $\frac{1}{N}$
+
+If the mutation rate is $0$, then regardless of the population size the stochastic process will go toward extinction, such that heterozygosity will disappear. 
+
+## 24) Given your heterozygosity result in 23, what are the only possible frequencies for A1 after a very large number of generations?
+
+0 
+
+## 25) In problem seven you found E{pk} for any value of k, including k arbitrarily large. In problem 24 you found all the possible frequencies pk could be after an arbitrarily large time. Putting this all together: what is the probability that the A1 allele will ultimately FIX in the population (i.e. what is the probability that the A1 allele will eventually reach frequency 1)? What is the probability that the A1 will ultimately be lost from the population?
+
+We expect the frequency of allele $A_1$ to be $p_0$ after an arbitrarily large number of generations, but $p_k$ can only be 0 given infinite time. The probability that the $A_1$ allele ultimately fixes in the population is $1- \frac{1}{2N}$, and the probability that it is lost from the population is $\frac{1}{2N}$.
+
+
