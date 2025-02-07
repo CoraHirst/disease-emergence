@@ -346,12 +346,19 @@ Heterozygosity in generation $k$ considering a constant very small mutation rate
 $$
 H_{k} = H_{k-1} + (1-H_{k-1})(1-(1-\mu)^2)
 $$
+where (1 - (1-mu)^2) is the probability at least one of these bad boys mutated. 
+
+but without the force of drift and approximating the effect of mutation:
+
+$$
+H_{k-1} + 2\mu(1-H)
+$$
 
 
 ```{r q15}
 
 #define heterozygosity function
-H_prime = function(H) {H + (1-H)*(1-(1-mu)^2)}
+H_prime = function(H) {H + 2*mu*(1-H)}
 
 #parameters
 mu = 10^-2 #mutation rate
@@ -378,7 +385,7 @@ plot(x = heterozygosity[,1], y = heterozygosity[,2])
 
 ## 16) Now consider a finite population of size N with mutation rate to new alleles $\mu$ and current heterozygosity H. What is the expected heterozygosity next generation?
 
-The change in heterozygosity from one generation to the next, $\Delta \mathcal H$ would be the sum of the change due to drift (negative and exponential) and the change due to mutation (linear terma and exponential term.) Thus:
+The change in heterozygosity from one generation to the next, $\Delta \mathcal H$ would be the sum of the change due to drift (negative and exponential) and the change due to mutation (linear terms and exponential term.) Thus:
 
 $$
 \Delta \mathcal H = -\frac{1}{2N} \mathcal H + 2\mu(1-\mathcal H)
@@ -403,7 +410,7 @@ N = 100 #population size
 gens = 1000 #generations to simulate
 
 #initial conditions
-H_0 = 0.9#initial heterozygosity
+H_0 = 0.9 #initial heterozygosity
 
 #matrix to store heterozygosities
 heterozygosity = matrix(nrow = gens, ncol = 2) #row = generation, col = generation, heterozygosity
@@ -464,6 +471,7 @@ The expected homozygosity at equilibrium should be $\hat{\mathcal G} = 1 - \hat{
 $$
 \hat{\mathcal G} = 1 - \frac{4N\mu}{1+4N\mu} = 1 - \frac{4(100)(0.01)}{1 + 4(100)(0.01)} = 1 - \frac{4}{5} = 0.2
 $$
+
 ## 20) In a Wright-Fisher population of size 12,500 diploid individuals, you observe a protein with heterozygosity 0.1. Estimate the mutation rate at this locus, assuming the population has been at constant size for a very long time.
 
 We assume that the mutation rate is constant and there is no force of evolution happening at this locus other than drift (reducing heterozygosity) and mutation (increasing heterozygosity.) 
@@ -473,6 +481,7 @@ If the population has been at a constant size for a long time, we can also assum
 $$
 \hat{\mathcal H} = 0.1 = \frac{4N\mu}{1+4N\mu} 
 $$
+
 as $N = 12500$, we can solve for $\mu$:
 
 $$
@@ -503,6 +512,9 @@ $$
 N = \mathcal O(10^4)
 $$
 That's a small city or a late stage bronze age civilization. cool.
+
+
+(Estimating heterozygosity at a site by site basis...)
 
 
 ## 22) Formula 2.9 in Gillespie’s book is an approximation. Find the exact solution for the equilibrium value of H. Compare this exact solution to the approximation given in 2.9 for {μ = 0.1, N = 10}, {μ = 0.1, N = 1000}, {μ = 0.001, N = 10}, and {μ = 0.001, N = 1000}. Which parameter makes a bigger difference in the approximation? Is the approximation ``good enough'' for you?
@@ -549,11 +561,13 @@ print(df)
 
 IF the A1 allele exists only in a single copy, and there are only two alleles at the locus, then one individual out of N must be heterozygous, such that $H_0$ = $\frac{1}{N}$
 
-If the mutation rate is $0$, then regardless of the population size the stochastic process will go toward extinction, such that heterozygosity will disappear. 
+If the mutation rate is $0$, then regardless of the population size the stochastic process will go toward extinction, such that heterozygosity will disappear. (only drift acting on the population)
 
 ## 24) Given your heterozygosity result in 23, what are the only possible frequencies for A1 after a very large number of generations?
 
-0 
+(all smaller than 1/2N), because all heterozygotes smaller than 1/N, so 0. No source of introduction with mutation. 
+
+H
 
 ## 25) In problem seven you found E{pk} for any value of k, including k arbitrarily large. In problem 24 you found all the possible frequencies pk could be after an arbitrarily large time. Putting this all together: what is the probability that the A1 allele will ultimately FIX in the population (i.e. what is the probability that the A1 allele will eventually reach frequency 1)? What is the probability that the A1 will ultimately be lost from the population?
 
