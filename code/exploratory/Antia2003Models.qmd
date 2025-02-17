@@ -1,0 +1,32 @@
+---
+title: "Exploring Multi-type Branching Processes"
+subtitle: "Recapitulating the results of Antia 2003"
+format: pdf
+execute:
+  echo: false
+  warning: false
+bibliography: ../../assets/bibFiles/dataanalysis-references.bib
+csl: ../../assets/bibFiles/apa.csl
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+
+source(here("code", "functions", "functions.R"))
+```
+
+# Objective
+
+We are interested in exploring the probability of emergence of zoonotic disease in a population immune to a cross-reactive relative of the pathogen, in particular how the emergence probability changes with immunity in the population.
+
+When the first infection caused by a spillover event from the animal reservoir into humans has an $R_0 < 1$, a short chain of transmission may stochastically occur before the pathogen goes extinct in the human population. 
+
+During these stuttering chains of human-human transmission, selection may act on mutations acquired during infection and the zoonotic pathogen may evolve a higher $R_0$. 
+
+These ideas were initially explored in @AntiaNature2003, wherein the probability of disease emergence as a function of 1) mutation rate, 2) number of mutations required for specialization to the new host, and 3) fitness of intermediate mutations, were modeled using a muti-type branching process framework. 
+
+The goal of this document is to develop and plot the same models present in @AntiaNature2003.
