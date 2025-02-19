@@ -1,10 +1,10 @@
 ####### Figure 2: Single mutation required for emergence #######
 ### single-mutation probability of extinction function 
-pEmergence_single = function(mu, R0_1, Rfinal){
+pEmergence_single = function(mu, R_wt, R_adapted){
   ### ## Define fixed point equations
   # pgfs - qi
-  fpeq_1 = function(q1,q2) {exp(-(1-mu)*R0_1*(1-q1))*exp(-mu*R0_1*(1-q2)) - q1} # pgf of secondary cases from type 1 set to and evaluated at q1, q2 (extinction probs for lineages starting with type 1 or type 2 infection)
-  fpeq_2 = function(q1,q2) {exp(-Rfinal*(1-q2)) - q2} # pgf of secondary cases from type 2 set to and evaluated at q1, q2
+  fpeq_1 = function(q1,q2) {exp(-(1-mu)*R_wt*(1-q1))*exp(-mu*R_wt*(1-q2)) - q1} # pgf of secondary cases from type 1 set to and evaluated at q1, q2 (extinction probs for lineages starting with type 1 or type 2 infection)
+  fpeq_2 = function(q1,q2) {exp(-R_adapted*(1-q2)) - q2} # pgf of secondary cases from type 2 set to and evaluated at q1, q2
   
   # define system of nl equations
   single_mut <- function(x) { # input function for nleqslv equation solver
@@ -19,8 +19,8 @@ pEmergence_single = function(mu, R0_1, Rfinal){
   
   # parameters
   mu = mu #mutation rate
-  R0_1 = R0_1 # R_0 of type 1 infections, aka R_0 of introduced pathogen
-  Rfinal = Rfinal # R_0 of type 2 infections
+  R_wt = R_wt # R_0 of type 1 infections, aka R_0 of introduced pathogen
+  R_adapted = R_adapted # R_0 of type 2 infections
   
   # define initial conditions 
   init = c(1,0) #start with 1 wild type and no evolved
@@ -40,11 +40,11 @@ pEmergence_single = function(mu, R0_1, Rfinal){
 
 ###### Figure 3: Multiple mutations required for emergence ####
 #### jackpot model
-pEmergence_jackpot = function(n, mu, R0_1, Rfinal){ #n is number of intermediate types, m-2, mu is mutation rate, R0_1 is wt R0, Rfinal is adapted type R0
+pEmergence_jackpot = function(n, mu, R_wt, R_adapted){ #n is number of intermediate types, m-2, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
  
   # parms 
-  R0_1 = R0_1 #R0_1 of initial wildtype
-  Rfinal = Rfinal #final adapted type R0_m
+  R_wt = R_wt #R_wt of initial wildtype
+  R_adapted = R_adapted #final adapted type R0_m
   mu = mu #mutation rate (same for each type)
   m = n+2 #number of types here, number of intermediates in paper
   
@@ -60,9 +60,9 @@ pEmergence_jackpot = function(n, mu, R0_1, Rfinal){ #n is number of intermediate
   multi_mut <- function(x) {
     y <- numeric(m)
     for(i in 1:(m-1)){ #vectorize, fixed point equations i:(m-1) will have the same form
-      y[i] = exp(-(1-mu)*(R0_1)*(1-x[i]))*exp(-mu*R0_1*(1-x[i+1])) - x[i] #type i only gives rise to type i or type i+1
+      y[i] = exp(-(1-mu)*(R_wt)*(1-x[i]))*exp(-mu*R_wt*(1-x[i+1])) - x[i] #type i only gives rise to type i or type i+1
     }
-    y[m] = exp(-Rfinal*(1-x[m])) - x[m] #type m only gives rise to type m
+    y[m] = exp(-R_adapted*(1-x[m])) - x[m] #type m only gives rise to type m
     y
   }
   
@@ -76,14 +76,14 @@ pEmergence_jackpot = function(n, mu, R0_1, Rfinal){ #n is number of intermediate
 }
 
 #### additive model
-pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Rfinal is adapted type R0
+pEmergence_additive = function(n, mu, R_wt, R_adapted){ #m is number of types, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
   
   # parms 
-  R0_1 = R0_1 #R0_1 of initial wildtype
-  Rfinal = Rfinal #final adapted type R0_m
+  R_wt = R_wt #R_wt of initial wildtype
+  R_adapted = R_adapted #final adapted type R0_m
   mu = mu #mutation rate (same for each type)
   m = n+2 #number of types here, number of intermediates in paper
-  Rstep = (1-R0_1)/(m-1) # increase in R0 with each step
+  Rstep = (1-R_wt)/(m-1) # increase in R0 with each step
   
   # initial conditions
   init = c(1, rep(0, m-1)) #vector initial numbers of infections of each type, length(m); start with only 1 infection of wildtype, type 1
@@ -97,9 +97,9 @@ pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu i
   multi_mut <- function(x) {
     y <- numeric(m)
     for(i in 1:(m-1)){
-      y[i] = exp(-(1-mu)*(R0_1+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R0_1+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
+      y[i] = exp(-(1-mu)*(R_wt+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R_wt+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
     }
-    y[m] = exp(-Rfinal*(1-x[m])) - x[m]
+    y[m] = exp(-R_adapted*(1-x[m])) - x[m]
     y
   }
   
@@ -113,14 +113,14 @@ pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu i
 }
 
 #### additive model
-pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Rfinal is adapted type R0
+pEmergence_additive = function(n, mu, R_wt, R_adapted){ #m is number of types, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
   
   # parms 
-  R0_1 = R0_1 #R0_1 of initial wildtype
-  Rfinal = Rfinal #final adapted type R0_m
+  R_wt = R_wt #R_wt of initial wildtype
+  R_adapted = R_adapted #final adapted type R0_m
   mu = mu #mutation rate (same for each type)
   m = n+2 #number of types here, number of intermediates in paper
-  Rstep = (1-R0_1)/(m-1) # increase in R0 with each step
+  Rstep = (R_adapted-R_wt)/(m-1) # increase in R0 with each step
   
   # initial conditions
   init = c(1, rep(0, m-1)) #vector initial numbers of infections of each type, length(m); start with only 1 infection of wildtype, type 1
@@ -134,9 +134,9 @@ pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu i
   multi_mut <- function(x) {
     y <- numeric(m)
     for(i in 1:(m-1)){
-      y[i] = exp(-(1-mu)*(R0_1+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R0_1+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
+      y[i] = exp(-(1-mu)*(R_wt+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R_wt+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
     }
-    y[m] = exp(-Rfinal*(1-x[m])) - x[m]
+    y[m] = exp(-R_adapted*(1-x[m])) - x[m]
     y
   }
   
@@ -149,4 +149,42 @@ pEmergence_additive = function(n, mu, R0_1, Rfinal){ #m is number of types, mu i
   return(prob.emergence)
 }
 
+#### fitness valley model
+pEmergence_landscape = function(n, mu, R_wt, R_intermediates, R_adapted){ #m is number of types, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
+  
+  # parms 
+  R_wt = R_wt #R_wt of initial wildtype
+  R_adapted = R_adapted #final adapted type R0_m
+  mu = mu #mutation rate (same for each type)
+  R_intermediates = R_intermediates #vector of R_0s for the intermediate types, will be length(n)
+  m = n+2 #number of types here, number of intermediates in paper
+  
+  R0_i = c(R_wt, R_intermediates, R_adapted)
+  
+  # initial conditions
+  init = c(1, rep(0, m-1)) #vector initial numbers of infections of each type, length(m); start with only 1 infection of wildtype, type 1
+  xstart = c(1, rep(0, m-1)) #vector of initial guesses (between 0 and 1) for fixed point solution, (length(m))
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0_i[i])*(1-x[i]))*exp(-mu*(R0_i[i])*(1-x[i+1])) - x[i]
+    }
+    y[m] = exp(-R_adapted*(1-x[m])) - x[m]
+    y
+  }
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #extinction probabilities
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init) #calculate emergence prob from extinction prob
+  
+  return(prob.emergence)
+}
 

@@ -53,32 +53,32 @@ The probability that the pathogen evolves to give rise to a human-adapted infect
 ```{r fig-2a, results = "hide"}
 #single mutation required for evolution 
 ## parms 
-R0_1s = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
-Rfinal = 1 #  R_0 of human-adapted type 2 infection
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
+R_adapted = 1 #  R_0 of human-adapted type 2 infection
 mus = c(10^-1, 10^-2, 10^-3, 10^-4) # mus to test 
 
 # matrix to store emergence probabilities
-probs.emergence = matrix(nrow = length(R0_1s), ncol = length(mus)) #rows correspond to R0_1, cols to mu
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus)) #rows correspond to R_wt, cols to mu
 
-# solve for emergence probability for each mu, R0_1 combination
+# solve for emergence probability for each mu, R_wt combination
 for(j in 1:length(mus)){
   #set mu
   mu = mus[j] 
-  for(i in 1:length(R0_1s)){
-   # set R0_1
-    R0_1 = R0_1s[i]
+  for(i in 1:length(R_wts)){
+   # set R_wt
+    R_wt = R_wts[i]
    # solve for emegence probability and add to probs.emergene matrix
-   probs.emergence[i,j] = pEmergence_single(mu = mu, R0_1 = R0_1, Rfinal = Rfinal) # loaded from Nature_2003_functions.R
+   probs.emergence[i,j] = pEmergence_single(mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
   }
 }
 
 ### prepare probs.emergence for plotting
 # format wide df
-probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
 colnames(probs.emergence) = c("R0", as.character(formatC(mus, format = "e", digits = 1))) # add mu names to columns
 
 # pivot to longform 
-probs.emergence.long = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R0_1 and mu
+probs.emergence.long = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
  pivot_longer(cols = !R0,
   names_to = "mu",
   values_to = "Prob.Emergence"
@@ -108,41 +108,41 @@ Below, we plot the extinction probabilities of transmission chains as a function
 ```{r fig-2b, results = "hide"}
 #single mutation required for evolution 
 ## parms 
-R0_1s = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
-Rfinals = c(10^3,1.5,1.2) #  R_0 of human-adapted type 2 infection
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
+R_adapteds = c(10^3,1.5,1.2) #  R_0 of human-adapted type 2 infection
 mus = c(10^-1, 10^-3) # mus to test 
 
 #list to store matrices of emergence probabilities calculated with each mu
 probs.emergence.list = list()
 
-# simulate - will result in two dfs of emergence probabiliies v R0_1 for different Rfinals corresponding to the mu assumed while running simulations
+# simulate - will result in two dfs of emergence probabiliies v R_wt for different R_adapteds corresponding to the mu assumed while running simulations
 c = 1 # count refers to which mu to assume in vector of mus, and thus the element of the list to which we will be saving
 while(c <= length(mus)){
   #set mutation rate
     mu = mus[c] 
-  # matrix to store emergence probabilities for R_01 and Rfinal combinations
-  probs.emergence = matrix(nrow = length(R0_1s), ncol = length(Rfinals)) #rows correspond to R0_1, cols to Rfinal
-  # solve for emergence probability for each Rfinal, R0_1 combination
-    for(j in 1:length(Rfinals)){
-      #set Rfinal
-      Rfinal = Rfinals[j] 
-      for(i in 1:length(R0_1s)){
-       # set R0_1
-        R0_1 = R0_1s[i]
+  # matrix to store emergence probabilities for R_01 and R_adapted combinations
+  probs.emergence = matrix(nrow = length(R_wts), ncol = length(R_adapteds)) #rows correspond to R_wt, cols to R_adapted
+  # solve for emergence probability for each R_adapted, R_wt combination
+    for(j in 1:length(R_adapteds)){
+      #set R_adapted
+      R_adapted = R_adapteds[j] 
+      for(i in 1:length(R_wts)){
+       # set R_wt
+        R_wt = R_wts[i]
        # solve for emegence probability and add to probs.emergene matrix
-       probs.emergence[i,j] = pEmergence_single(mu = mu, R0_1 = R0_1, Rfinal = Rfinal) # loaded from Nature_2003_functions.R
+       probs.emergence[i,j] = pEmergence_single(mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
       }
     }
   
   ### prepare probs.emergence for plotting
   # format wide df
-  probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
-  colnames(probs.emergence) = c("R0", as.character(Rfinals)) # add mu names to columns
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(R_adapteds)) # add mu names to columns
   
   # pivot to longform and store in df list
-  probs.emergence.list[[c]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R0_1 and mu
+  probs.emergence.list[[c]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
    pivot_longer(cols = !R0,
-    names_to = "Rfinal",
+    names_to = "R_adapted",
     values_to = "Prob.Emergence"
   )
 
@@ -152,8 +152,8 @@ c = c+1 #next mu
 
 #plot
 ggplot() + 
-  geom_line(data = probs.emergence.list[[1]], aes(x = R0, y = Prob.Emergence, group = Rfinal, linetype = Rfinal, col = "10^-1")) +
-  geom_line(data = probs.emergence.list[[2]], aes(x = R0, y = Prob.Emergence, group = Rfinal, linetype = Rfinal, col = "10^-3")) +
+  geom_line(data = probs.emergence.list[[1]], aes(x = R0, y = Prob.Emergence, group = R_adapted, linetype = R_adapted, col = "10^-1")) +
+  geom_line(data = probs.emergence.list[[2]], aes(x = R0, y = Prob.Emergence, group = R_adapted, linetype = R_adapted, col = "10^-3")) +
   theme_bw() + #sets background color to white and grey gridlines
   labs(title = "fig 2b", x = "R0 of introduced pathogen", y = "Probability of emergence", col = "mu", linetype = "R0 of adapted") + #axis labels
   scale_y_continuous(trans = "log10") +
@@ -187,33 +187,33 @@ I'll use the same notation ($n$) as in the paper for clarity.
 
 ```{r fig-3a, results = "hide"}
 ## parms
-R0_1s = seq(0,1.2, by = 0.01) # R_0 of infection with introduced pathogen and all type 1:(m-1) infections
-Rfinal = 1.2 #  R_0 of human-adapted type m infection
+R_wts = seq(0,1.2, by = 0.01) # R_0 of infection with introduced pathogen and all type 1:(m-1) infections
+R_adapted = 1.2 #  R_0 of human-adapted type m infection
 mu = 10^-1 # mutation rate
 ns = 0:4 #m = 2:6
 
 # matrix to store emergence probabilities
-probs.emergence = matrix(nrow = length(R0_1s), ncol = length(ns)) #rows correspond to R0_1, cols to number of intermediats
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(ns)) #rows correspond to R_wt, cols to number of intermediats
 
-# solve for emergence probability for each mu, R0_1 combination
+# solve for emergence probability for each mu, R_wt combination
 for(j in 1:length(ns)){
   #set mu
   n = ns[j] 
-  for(i in 1:length(R0_1s)){
-   # set R0_1
-    R0_1 = R0_1s[i]
+  for(i in 1:length(R_wts)){
+   # set R_wt
+    R_wt = R_wts[i]
    # solve for emegence probability and add to probs.emergene matrix
-   probs.emergence[i,j] = pEmergence_jackpot(n = n, mu = mu, R0_1 = R0_1, Rfinal = Rfinal) # loaded from Nature_2003_functions.R
+   probs.emergence[i,j] = pEmergence_jackpot(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
   }
 }
 
 ### prepare probs.emergence for plotting
 # format wide df
-probs.emergence = cbind(R0_1s, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
 colnames(probs.emergence) = c("R0", as.character(ns)) # add n names to columns
 
 # pivot to longform 
-probs.emergence.long = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R0_1 and mu
+probs.emergence.long = probs.emergence %>% # columns R0, n, and Prob.emergence give Prob emergence for each combination of R_wt and n
  pivot_longer(cols = !R0,
   names_to = "n",
   values_to = "Prob.Emergence"
@@ -234,17 +234,129 @@ ggplot() +
 
 In figure 3b, the assumption that the $R_0$ of all intermediates is the same as the $R_0$ of the introduced pathogen is relaxed. Instead, three different fitness landscapes are explored: 
 
-1) the jackpot landscape, where only the final mutation offers an increase in $R_0$ from the $R_0$ of the introduced pathogen; 
+1) the jackpot landscape, where only the final mutation increases $R_0$ from the $R_0$ of the introduced pathogen (same as figure 3a); 
 2) the additive landscape, where the intermediate mutations increase $R_0$ by a fixed amount until the final mutation shifts $R_0 > 1$, and
-3) the fitness valley landscape, where the intermedate mutations can decrease $R_0$ 
+3) the fitness valley landscape, where the intermediate mutations can decrease $R_0$ 
 
-These models are only explored for the $n=1$ intermediate case, that is, for a 3-type branching process with wildtype, intermediate, and adapted types. 
-The function in `\code\functions\Nature_2003_functions.R` extends these to the m-type case. 
+These models are only explored for the $n=1$ intermediate case, that is, for a 3-type branching process with 1 wildtype, 1 intermediate, and 1 adapted type. 
+
+However, the functions in `\code\functions\Nature_2003_functions.R` allow us to explore these for the m-type case. 
 
 ```{r fig-3b, results = "hide"}
+## parms ##########################################################
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen and all type 1:(m-1) infections
+R_adapted = 1.5 #  R_0 of human-adapted type m infection
+mus = c(10^-1, 10^-3) # mutation rate
+n = 1 # 1 intermediate, 3 types
+
+#list to store matrices of emergence probabilities calculated with each model
+probs.emergence.list = list()
+
+######################## jAckpot model ###########################
+
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+
+#jackpot model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_jackpot(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R_wts column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[1]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
+
+######################## Additive model ###########################
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+  
+#additive model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_additive(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[2]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
+
+######################## Valley model ###########################
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+
+  
+#additive model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    #fitness valley - R0 of intermediate variant
+    R_intermediates = c(R_wt*0.5) #fitness is 0.7 of the WT
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_landscape(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted, R_intermediates = R_intermediates) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[3]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
 
 
+  
+######################## Plotting ###############################
+#plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence.list[[1]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "jackpot")) + #jackpot model
+  geom_line(data = probs.emergence.list[[2]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "additive")) + #additive model
+  geom_line(data = probs.emergence.list[[3]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "valley")) + #valley model
+  theme_bw() + #sets background color to white and grey gridlines
+  labs(title = "fig 3b", x = "R0 of introduced pathogen", y = "Probability of emergence", col = "mu", linetype = "landscape") + #axis labels
+  scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) +
+  scale_linetype_manual(values = c("valley" = "dotted", "additive" = "dashed", "jackpot" = "solid")) +
+  scale_color_manual(values = c("0.1" = "black", "0.001" = "forestgreen"))
+```
+
+
+```{r showplot}
+print(plot)
 
 ```
 
 
+
+
+
+
+
+
+
+# References
