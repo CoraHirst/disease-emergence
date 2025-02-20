@@ -25,7 +25,7 @@ my.colors = c("black", "orange", "red", "forestgreen", "blue")
 
 # Objective
 
-We are interested in exploring the probability of emergence of zoonotic disease in a population immune to a cross-reactive relative of the pathogen, and, in particular, how the emergence probability changes with the level of immunity in the population.
+We are interested in exploring the probability that a zoonotic pathogen evolves efficient human-human transmission (emergence) after spilling over into a human population, and, in particular, how the probability of disease emergence changes with the level of immunity in the population.
 
 When the first infection caused by a spillover event from the animal reservoir into humans has an $R_0 < 1$, a short chain of transmission may stochastically occur before the pathogen goes extinct in the human population. 
 
@@ -350,6 +350,14 @@ plot = ggplot() +
 print(plot)
 
 ```
+
+
+
+# Next steps
+
+As the $R_0$ of the initial spillover infection approaches 1, the emergence probability sharply increases. This effect is particularly evident for pathogens with low mutation rates (fig \ref{fig-2a}). This make sense - the higher the $R_0$, the more secondary cases are expected of a single infection, increasing the overall number of opportunities the pathogen has to stumble upon a mutation that increases transmissibility; at low mutation rates, this increase in opportunities is critical, as stumbling upon the right mutation takes more infections.
+
+A particularly interesting result is the effect of fitness landscapes on the probability of emergence. The additive model assumes that at any given starting $R_0$, the pathogen must aquire the same number of mutations to emerge.
 
 
 

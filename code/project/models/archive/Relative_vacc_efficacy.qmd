@@ -1,6 +1,6 @@
 ---
 title: "Effect of Partial Vaccination on Preventing Emergent Zoonoses"
-subtitle: "how does partial vaccination significantly delay emergence?" 
+subtitle: "how does partial vaccination delay emergence?" 
 format: html
 
 ---
