@@ -112,7 +112,7 @@ for(k in 1:length(mus)){ #creating a seperate dataframe, probs.emergence, for ea
     for(i in 1:length(R_wts)){
       probs.emergence.deltaR[i,j] = pEmergence_deltaR(delta_R = delta_Rs[j], mu = mu, R_wt = R_wts[i], R_adapted = R_adapted) #run simulation for each delta_R,R_wt combination
     }
-  }
+  }1/(10^-5)
   
   ## format matrix for plotting
   probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
