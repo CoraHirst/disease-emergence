@@ -39,3 +39,4 @@ pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   
   return(prob.emergence) 
 }
+

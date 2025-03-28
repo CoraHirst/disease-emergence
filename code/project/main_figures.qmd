@@ -10,7 +10,8 @@ library(ggplot2) #for plotting
 library(here) #for easy local path referencing
 library(tidyverse) #for easy manipulation of data structures
 library(nleqslv) #for solving nonlinear systems of equations
-library(gridExtra) #for arrangeing plots
+library(gridExtra) #for arrangeing plotsx
+
 source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
 source(here("code", "functions", "archive", "poisson_functions.R")) #for nature version of additive mutation function
 
