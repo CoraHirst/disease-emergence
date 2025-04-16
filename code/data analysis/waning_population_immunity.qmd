@@ -1,0 +1,111 @@
+---
+title: "Effect of partial vaccination on disease emergence"
+subtitle: "To what extenct does partial vaccination hinder the adaptive evolution of pathogens with subcritical R_0? "
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(gridExtra) #for arrangeing plotsx
+
+source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
+
+# colors for plotting
+my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+```
+
+# Objective
+
+The goal of this document is to model the decay of immunity to smallpox and related pox viruses at the population level after vaccination ceased (1980) in the Democratic Republic of the Congo. 
+
+# Approach 
+
+We use a Leslie-matrix age-structured model to capture the birth of susceptible individuals and loss of immune individuals in the DRC from 1980-2023. 
+
+We assume that all individuals in all age classes were vaccinated against or immune to smallpox by the time of smallpox eradication (and the subsequent cessation of vaccination campaigns.)  
+
+Fecundity and survivorship estimates by single-year age are taken from the WHO [Department of Economic and Social Affairs, Population Division](https://population.un.org/wpp/downloads?folder=Standard%20Projections&group=Population).
+
+# Loading data
+
+The datasets for this analysis can be found in the excel file `data/congo/congo_demographics_1980-2023.xlsx`. This file contains three sheets: 
+
+1) the number of individuals of each age in 1980 (census),
+2) mortality by age from 1980-2023, and
+3) fecundity by age from 1980-2023.
+
+Note that fecundity is given as the average number of children per 1000 women. We will necessarily need to transform these estimates to return the number of fertile offspring (female) per 1 woman. We will return to this. 
+
+The following code chunk imports these three sheets as 3 independent data frames in a single list: 
+
+```{r load-data}
+congo_demographics = multiplesheets(here("data", "congo", "congo_demographics_1980-2023.xlsx"))
+
+```
+
+Here, we take two processing steps. 
+
+First, mortality is reported in the number of deaths (in thousands) per age. For death rate in each age group, I need to divide the number of deaths by the 
+
+
+
+
+```{r exploratory}
+#formatting
+population = t(congo_demographics$population)
+summary(population)
+columns  = c("age", as.character(population[1,]))
+
+population = population[-1,]
+ncol(population)
+population = cbind((0:(nrow(population)-1)), population)
+
+colnames(population) = columns
+
+head(population)
+
+# counting number older than year - 1980
+
+
+
+```
+
+```{r}
+#formatting
+population = congo_demographics$population
+summary(population)
+
+head(population)
+
+# counting number immune 
+pop = population %>%
+  mutate("immune" = sum((Year-1980+1):101))
+
+
+#longform
+pop = pivot_longer(population, 
+                   cols = !Year,
+                   names_to = "age",
+                   values_to = "size")
+pop = pop %>% mutate("age" = as.numeric(age))
+
+test = pop %>%
+  group_by(Year) %>%
+  filter(age >= Year-1980) %>%
+  
+
+test %>% filter(Year == 2023)
+
+# counting number older than (year - 1980)
+pop = pop %>%
+  mutate("immune" = sum() )
+
+
+test = population %>%
+  mutate("immune" = rowSums(.[("Year"-1980+1):101]))
+
+immune = sumRows(population, )
+```
