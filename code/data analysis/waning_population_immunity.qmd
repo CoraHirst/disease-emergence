@@ -126,6 +126,126 @@ Also note that both the population size, death rate, and fecundity dataframes ha
 
 For our leslie matrix, we will sadly want to collapse these back to long form. 
 
+```{r formating-parameter-matrices}
+# matrix of birth rates. Rows are year, columns are age
+births = births %>% pivot_wider(
+  names_from = Age,
+  values_from = Births
+)
+#order columns by increasing age and save as matrix
+births = births[,as.character(0:100)] %>% as.matrix() #ensures the correct order of columns
+
+# matrix of death rates. Rows are year, columns are age
+deaths = deaths %>% 
+  select(Year, Age, mortality) %>% pivot_wider(
+  names_from = Age, 
+  values_from = mortality
+)
+#order columns by increasing age and save as matrix
+deaths = deaths[, as.character(0:100)] %>% as.matrix() #ensures the correct order of columns by age
+
+
+# isolate initial population structure in 1980 as vector
+init_pop = population %>% filter(Year == 1980) %>% pull(Size) #be sure that pop is in order of ages. Sizes are in thousands. 
+
+```
+
+Setting up leslie matrix: 
+
+```{r matrix-model-setup}
+#initialize leslie matrix with parameters from 1980
+L = diag(x = 1 - deaths[1, 1:100]) #firts year survivorship 1-death rate on diagonal
+L = rbind(births[1, 1:100], L) #add first year fecundities to top row
+L = cbind(L, c(births[1,101], rep(0,99), 1-deaths[1,101])) # add column ensures last row includes final death rate 
+tail(L) #looks good!
+
+# matrix to store population densities by age each year. rows will be age, columns will be year. 
+m = matrix(nrow = length(init_pop), ncol = 2023-1979) #44 columns for 44 years
+m[,1] = init_pop #initialize first column with populations structure in 1980
+
+#how many generations/years to run matrix? 
+years = 2023-1980
+
+```
+
+```{r simulate}
+#simulate population structure since 1980
+for(year in 1:years){
+  m[,year+1] = L %*% m[,year] #update population distribution
+  
+  #adjust leslie matrix with parameters from year
+  L = diag(x = 1 - deaths[year+1, 1:100]) #firts year survivorship 1-death rate on diagonal
+  L = rbind(births[year+1, 1:100], L) #add first year fecundities to top row
+  L = cbind(L, c(births[year+1,101], rep(0,99), 1-deaths[year+1,101])) # add column ensures last row includes final survivorship
+  
+}
+
+```
+
+```{r plot-total}
+population_size = apply(m, 2, sum)
+plot(x = 0:years, y = population_size)
+```
+
+Looks good!
+
+```{r }
+#formatting population matrix as age dataframe
+sim_pop = cbind(1980:2023, t(m)) %>% as.data.frame() 
+colnames(sim_pop) = c("Year", as.character(0:100))
+
+
+# extracting population size through time and formatting in long-form
+sim_population = sim_pop %>% 
+  pivot_longer( #longform for easier manipulation 
+    cols = !Year,
+    names_to = "Age", 
+    values_to = "Size"
+    ) %>% 
+  as.data.frame() # make data frame, not tibble
+
+summary(sim_population) #see variable types and information
+
+# mutate age feature to numeric
+sim_population = sim_population %>% mutate("Age" = as.numeric(Age))
+```
+
+```{r}
+# adding new feature to population dataframe - vacced
+# binary, true if older than age-1980 and thus had received vaccine or natural infection; false if younger and not immune.
+# indicated whether immune
+sim_population = sim_population %>%
+  mutate("Vacced" = case_when(Age >= Year - 1980 ~ TRUE, .default = FALSE))
+
+# sum number category for all vacced within each year
+sim_vacc_frac = sim_population %>%
+  group_by(Year) %>% #perform functions within groups
+  filter(Vacced == T) %>% #filter for only vaccinated ages
+  summarise(num_immune = sum(Size)) #sum across all ages 
+
+#add total population size each year to data frame
+sim_vacc_frac$total = sim_population %>%
+  group_by(Year) %>%
+  summarise(total = sum(Size)) %>%
+  pull("total")
+
+#calculate fraction immune
+sim_vacc_frac = sim_vacc_frac %>%
+  mutate("prop_immune" = num_immune/total) #yahoo
+
+```
+
+```{r plot-declining-immunity-sim}
+ggplot() + 
+  geom_point(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "red") + 
+  geom_point(data = vacc_frac, aes(x = Year, y = (prop_immune))) + geom_line(data = vacc_frac, aes(x = Year, y = (prop_immune))) +
+  labs(x = "Year", y = "log10 Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023") +
+  theme_bw()  
+
+```
+
+Simulated fraction immune in red, actual reported fraction in black. Cool!
+
 Two ways: 
 - first, model decay forward using 2023 birth/death rates
 - second, model decay forward using projected birth/death rates from trends in both 
