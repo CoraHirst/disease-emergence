@@ -1,6 +1,6 @@
 ---
-title: "Effect of partial vaccination on disease emergence"
-subtitle: "To what extenct does partial vaccination hinder the adaptive evolution of pathogens with subcritical R_0? "
+title: "Exploring waning population immunity to Smallpox in the Congo"
+subtitle: "How to best model the decay of immunity to smallpox at the population level after ceasing vaccination"
 format: html
 ---
 
@@ -21,7 +21,9 @@ my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
 
 # Objective
 
-The goal of this document is to model the decay of immunity to smallpox and related pox viruses at the population level after vaccination ceased (1980) in the Democratic Republic of the Congo. 
+The goal of this document is to explore models of the decay of immunity to smallpox and related pox viruses at the population level after vaccination ceased (1980) in the Democratic Republic of the Congo. 
+
+Two methods will be 1) predicting fecudities and mortality from trends in demographics and using an age-structured matrix model to estimate the decay in the proportion of individuals immune, and 2) fitting a decay model to population size through time. 
 
 # Approach 
 
@@ -253,7 +255,13 @@ Two ways:
 Finally, we will need to account for the effect of increasing population density on the success of transmission. Let's consider this moving forward. 
 
 
+To do: 
 
+1) Projectsions: 
+  a) lets give the matrix model and the true data model their own scripts
+  b) lets extrapolate from an exponential waning model with the true data
+  c) lets extrapolate the birth and death rates from the true data
+  d) if we want we can plot population structure in 1980 and 2023 and make an inference on future structure from that?
 
 
 Sojourn:
