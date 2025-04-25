@@ -10,11 +10,13 @@ library(ggplot2) #for plotting
 library(here) #for easy local path referencing
 library(tidyverse) #for easy manipulation of data structures
 library(gridExtra) #for arrangeing plotsx
+library(RColorBrewer) #for colors
 
 source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
 
 # colors for plotting
-my.colors = c("black", "red", "forestgreen", "blue", "orange", "purple") #because pretty
+num_cols = 101
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
 ```
 
 # Objective
@@ -48,64 +50,144 @@ congo_demographics = multiplesheets(here("data", "congo", "congo_demographics_19
 
 Here, we take two processing steps. 
 
-First, mortality is reported in the number of deaths (in thousands) per age. For death rate in each age group, I need to divide the number of deaths by the 
+First, mortality is reported in the number of deaths (in thousands) per age. For death rate in each age group, I need to divide the number of deaths by the total number in that age group in the population. As both the number of individuals at each and the number of deaths at each age are given per 1000, I can simply take the ratio of dead:population. 
+
+```{r death-rates}
+# extract mortality dataframe from congo_demographics
+deaths= congo_demographics$mortality %>% #longform for easier manipulation
+  pivot_longer(
+    cols = !Year,
+    names_to = "Age", 
+    values_to = "Deaths"
+  ) %>%
+  mutate("Age" = case_when(Age == "100+" ~ "100", .default = Age)) #rename 100+ age to 100 
+
+# extract total number of individuals at each age from population dataframe in congo_demographics
+population = congo_demographics$population %>%
+  pivot_longer(
+    cols = !Year, 
+    names_to = "Age",
+    values_to = "Size"
+  ) 
+
+# combine data frames by Age and Year 
+deaths = inner_join(deaths,population, by = c("Year", "Age"))
+
+# use nrows to check all rows are kept
+deaths = deaths %>%
+  mutate("mortality" = Deaths/Size)
+
+ggplot(data = deaths) +
+  geom_line(aes(x = Year, y = log10(mortality), color = as.factor(as.numeric(Age)), group = as.factor(as.numeric(Age)))) + 
+  labs(x = "Year", y = "log10 Mortality Rate", title = "Mortality by Age, 1980 - 2023", colour = "Age" ) + 
+  scale_color_manual(values = my.colors) + 
+  theme_bw()
+```
+
+We see some decline in mortality over time, which is a good sign that we've got these right. For late projections, we might use this information to make predictions about mortality rates in the future. 
+
+Fecundity is given as the average number of children per 1000 women. We will necessarily need to transform these estimates to return the number of fertile offspring (female) per 1 woman; we can accomplish this by dividing by $2 \times 1000$.
 
 
+```{r birth-rates}
+# extract fecundity dataframe from congo_demographics
+births = congo_demographics$fertility
+# find the minimum and maximum ages 
+min_age = min(as.numeric(colnames(births)), na.rm = T)
+max_age = max(as.numeric(colnames(births)), na.rm = T)
+add_ages = as.character(c(0:(min_age-1), (max_age+1):100))
+
+# add columns of zero fecundity for non-fertile ages
+births[add_ages] = 0
 
 
-```{r exploratory}
-#formatting
-population = t(congo_demographics$population)
-summary(population)
-columns  = c("age", as.character(population[1,]))
+# format df to lonform
+births = births %>% pivot_longer(
+    cols = !Year,
+    names_to = "Age", 
+    values_to = "Births"
+  )
 
-population = population[-1,]
-ncol(population)
-population = cbind((0:(nrow(population)-1)), population)
+# mutate births to obtain fertile offspring per woman 
+births = births %>%
+  mutate("Births" = Births/(2*1000))
 
-colnames(population) = columns
-
-head(population)
-
-# counting number older than year - 1980
-
-
+#plot
+ggplot(data = births) +
+  geom_line(aes(x = Year, y = (Births), color = as.factor(as.numeric(Age)), group = as.factor(as.numeric(Age)))) + 
+  labs(x = "Year", y = "log10 Birth Rate", title = "Fecundity by Age, 1980 - 2023", colour = "Age" ) + 
+  scale_color_manual(values = my.colors) + 
+  theme_bw()
 
 ```
 
-```{r}
-#formatting
-population = congo_demographics$population
-summary(population)
+Note that birth rate will be considered 0 for ages 0-14 and 50-100, as is assumed in the report. 
+Also note that both the population size, death rate, and fecundity dataframes have 4444 rows, corresponding to each Age-Year combination. 
 
-head(population)
+For our leslie matrix, we will sadly want to collapse these back to long form. 
 
-# counting number immune 
-pop = population %>%
-  mutate("immune" = sum((Year-1980+1):101))
+Two ways: 
+- first, model decay forward using 2023 birth/death rates
+- second, model decay forward using projected birth/death rates from trends in both 
+
+Finally, we will need to account for the effect of increasing population density on the success of transmission. Let's consider this moving forward. 
 
 
-#longform
-pop = pivot_longer(population, 
-                   cols = !Year,
-                   names_to = "age",
-                   values_to = "size")
-pop = pop %>% mutate("age" = as.numeric(age))
 
-test = pop %>%
+
+
+Sojourn:
+
+```{r formatting-population-dataframe}
+# extracting population size through time from congo_demographics list and formatting in long-form
+population = congo_demographics$population %>% 
+  pivot_longer( #longform for easier manipulation 
+    cols = !Year,
+    names_to = "Age", 
+    values_to = "Size"
+    ) %>% 
+  as.data.frame() # make data frame, not tibble
+
+summary(population) #see variable types and information
+
+# mutate age feature to numeric
+population = population %>% mutate("Age" = as.numeric(Age))
+
+```
+
+```{r reported-vaccinated-through-time}
+# adding new feature to population dataframe - vacced
+# binary, true if older than age-1980 and thus had received vaccine or natural infection; false if younger and not immune.
+# indicated whether immune
+population = population %>%
+  mutate("Vacced" = case_when(Age >= Year - 1980 ~ TRUE, .default = FALSE))
+
+# sum number category for all vacced within each year
+vacc_frac = population %>%
+  group_by(Year) %>% #perform functions within groups
+  filter(Vacced == T) %>% #filter for only vaccinated ages
+  summarise(num_immune = sum(Size)) #sum across all ages 
+
+#add total population size each year to data frame
+vacc_frac$total = population %>%
   group_by(Year) %>%
-  filter(age >= Year-1980) %>%
-  
+  summarise(total = sum(Size)) %>%
+  pull("total")
 
-test %>% filter(Year == 2023)
-
-# counting number older than (year - 1980)
-pop = pop %>%
-  mutate("immune" = sum() )
-
-
-test = population %>%
-  mutate("immune" = rowSums(.[("Year"-1980+1):101]))
-
-immune = sumRows(population, )
+#calculate fraction immune
+vacc_frac = vacc_frac %>%
+  mutate("prop_immune" = num_immune/total) #yahoo
 ```
+
+```{r plot-declining-immunity}
+ggplot(data = vacc_frac) + 
+  geom_point(aes(x = Year, y = log10(prop_immune))) + geom_line(aes(x = Year, y = log10(prop_immune))) + 
+  labs(x = "Year", y = "log10 Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023") +
+  theme_bw()  
+
+```
+
+Looks more or less like an exponential drop in immunity, though with slightly great decay (greater concavity). 
+
+Lets see if we can recreate this behavior with the leslie matrix model. 
+
