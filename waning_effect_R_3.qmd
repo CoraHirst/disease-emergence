@@ -1,0 +1,27 @@
+---
+title: "The effect of waning immunity on effective R0 of mpox"
+substitle: "Doc 3. How much does waning population immunity change the effective R0 of mpox over time"
+format: html
+---
+
+# Objective
+
+The goal of this document is to anticipate the change in effective R of mpox over time with waning immunity at the population level. We first will consider the case when cross protection is perfect and within-host immunity is always sterilizing throughout their lifetime. We will then relax these assumptions to predict the effect of within-host waning and imperfect cross-protection. 
+
+# Loading predictions for waning population immunity 
+
+Previously, we used a matrix-model approach to predict the decay of immunity at the population level in the DRC after vaccination stopped in 1980 (`code\data analysis\congo\matrix_model_projections_2.qmd`.) These estimates are stored in `results\data analysis\congo`. Now, we will use these estimates to predict how the effective R of mpox should be changing over time. 
+
+We load the predicted level of population immunity over time below: 
+
+```{r load-data}
+#read csv
+prop_immune = read.csv(file = here("results", "data analysis", "congo", "proportion_immune.csv"))
+prop_immune = prop_immune[,-1] # first column when loading csv is row number and unnecessary, so we can delete it
+```
+
+The first thing to note is that population size is exponentially increasing over time. With a denser population, the probability of infection per infection increases. (this comes into play for force of infection?)
+
+$R_{eff} = R_0 \frac{S}{N} = R_0(1-f)$, where $f$ is the fraction of the population immune. How to encorporate density?
+
+We have the number of susceptible 

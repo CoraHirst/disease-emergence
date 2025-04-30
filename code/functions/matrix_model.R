@@ -5,7 +5,7 @@ matrix_model = function(births, deaths, init_pop, gens){#initialize leslie matri
     tail(L) #looks good!
     
     # matrix to store population densities by age each year. rows will be age, columns will be year. 
-    m = matrix(nrow = length(init_pop), ncol = 2023-1979) #44 columns for 44 years
+    m = matrix(nrow = length(init_pop), ncol = gens+1) #44 columns for 44 years
     m[,1] = init_pop #initialize first column with populations structure in 1980
     
     #simulate population structure since 1980
@@ -18,6 +18,6 @@ matrix_model = function(births, deaths, init_pop, gens){#initialize leslie matri
       L = cbind(L, c(births[year+1,101], rep(0,99), 1-deaths[year+1,101])) # add column ensures last row includes final survivorship
       
     }
-    
+    return(m)
     
 }

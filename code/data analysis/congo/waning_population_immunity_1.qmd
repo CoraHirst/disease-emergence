@@ -1,6 +1,6 @@
 ---
 title: "Exploring waning population immunity to Smallpox in the Congo"
-subtitle: "Doc 1. How to best model the decay of immunity to smallpox at the population level after ceasing vaccination"
+subtitle: "Doc.1 How to best model the decay of immunity to smallpox at the population level after ceasing vaccination"
 format: html
 ---
 
@@ -24,7 +24,7 @@ my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
 
 The goal of this document is to explore models of the decay of immunity to smallpox and related pox viruses at the population level after vaccination ceased (1980) in the Democratic Republic of the Congo. 
 
-Two methods will be 1) predicting fecudities and mortality from trends in demographics and using an age-structured matrix model to estimate the decay in the proportion of individuals immune, and 2) fitting a decay model to population size through time. 
+Two methods will be 1) predicting fecundities and mortality from trends in demographics and using an age-structured matrix model to estimate the decay in the proportion of individuals immune, and 2) fitting a decay model to population size through time. 
 
 # Approach 
 
