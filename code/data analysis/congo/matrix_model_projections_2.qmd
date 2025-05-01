@@ -221,3 +221,6 @@ write.csv(sim_vacc_frac, file = file2) #in long form
 
 
 ```
+
+
+# How

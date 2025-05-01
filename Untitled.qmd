@@ -1,0 +1,33 @@
+---
+title: "Effect of waning population immunity on R0"
+format: html
+---
+
+# Objective 
+
+The objective of this document is to predict how the probability of zoonotic disease emergence changes as population immunity decays. We will explicitly consider the effects of: 
+
+1) cross-immunity, 
+2) waning immunity at the individual level, 
+3) relative contributions of decreased population immunity on changing both the number of spillover events and the the probability of evolution per case. 
+
+Within-host waning of smallpox immunity after vaccination or infection, as well as incomplete cross-protection to mpox, both effect the probability of disease emergence with decay in population immunity at the level of individual transmissibility. We can specifically consider an individual's susceptibility to infection and ability to transmit an infection - $IE_{SI}$ as a function of the level of immunity and cross-protectiveness of immunity to smallpox. 
+
+# Cross immunity
+
+$$ 
+r_{eff} = r_0(1-cf)
+$$
+
+where c is the extent to which smallpox immunity reduces mpox transmission ($IE_{SI}$) compared to smallpox transmission. 
+
+# Waning immunity at the individual level
+
+Considering the effect of waning within host immunity at the individual level and $R_{eff}$ of a virus at the population level requires considering the distirbution of individuals in the population by level of susceptibility. 
+
+We need to know two things: 
+
+1) how a person's immunity decays over time, and 
+2) how the transmissibility of the virus depends on the level of immunity ($IE_{SI}(\text{time after infection})$)
+
+This is going to be somewhat complicated... I imagine the distribution in susceptibility is going to change over time
