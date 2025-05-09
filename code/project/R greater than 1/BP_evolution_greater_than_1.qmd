@@ -1,0 +1,122 @@
+---
+title: "Exploring waning population immunity to Smallpox in the Congo"
+subtitle: "Doc.1 How to best model the decay of immunity to smallpox at the population level after ceasing vaccination"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(gridExtra) #for arrangeing plotsx
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+
+source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
+
+# colors for plotting
+num_cols = 101
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+The objective of this document is to develop a function to simulate the multi-step branching process of the adaptation of a virus with a near critical $R_0$ out of a zoonotic source. 
+
+# Model 
+
+```{r bp-function}
+### define function
+
+bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
+  ##### calculate parameters
+  # caluclate number of types
+  m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
+  # define vector of R0 for each type 
+  R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
+  # define empty matrix for storing numbers of individuals of each type over gens generations
+  X = matrix(nrow = m, ncol = gens+1) #rows are types over time, columns are individuals of each type at given time
+ 
+  ##### initial conditions
+  init = c(1, rep(0, m-1)) # start with one individual of wt and no individuals of any other type
+  X[,1] = init # add to matrix for gen 0
+ 
+  #### simulation
+  # stochastic simulation summing random variables each gen
+  for(gen in 2:gens){
+    X[1,gen] = sum(rpois(n = X[1,gen-1], lambda = (1-mu)*R0[1])) # add X1,gen-1 random samples from pois dist with lambda = (1-u)R0(i)
+    for(i in 2:(m-1)){
+      X[i,gen] = sum(rpois(n = X[i,gen-1], lambda = (1-mu)*R0[i])) + # contributions from type i
+        sum(rpois(n = X[i-1,gen-1], mu*R0[i-1])) #mutants from type i-1
+    }
+    X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
+      sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
+  
+  if(all(X == 0)){
+    print("extinct")
+    break} #break if extinct
+  else if(any(X > 10^6, na.rm = T)){
+    print("too big") 
+    break} #break if really large
+  }
+  return(X)
+}
+
+
+```
+
+```{r}
+# parms
+Rwt = 1.3
+deltaR = 0.1 
+Rfinal = 3
+mu = 10^-3 
+gens = 1000
+
+
+##### calculate parameters
+  # caluclate number of types
+  m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
+  # define vector of R0 for each type 
+  R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
+  # define empty matrix for storing numbers of individuals of each type over gens generations
+  X = matrix(nrow = m, ncol = gens+1) #rows are types over time, columns are individuals of each type at given time
+ 
+  ##### initial conditions
+  init = c(1, rep(0, m-1)) # start with one individual of wt and no individuals of any other type
+  X[,1] = init # add to matrix for gen 0
+ 
+  #### simulation
+  # stochastic simulation summing random variables each gen
+  for(gen in 2:gens){
+    X[1,gen] = sum(rpois(n = X[1,gen-1], lambda = (1-mu)*R0[1])) # add X1,gen-1 random samples from pois dist with lambda = (1-u)R0(i)
+    for(i in 2:(m-1)){
+      X[i,gen] = sum(rpois(n = X[i,gen-1], lambda = (1-mu)*R0[i])) + # contributions from type i
+        sum(rpois(n = X[i-1,gen-1], mu*R0[i-1])) #mutants from type i-1
+    }
+    X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
+      sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
+  
+  if(all(X[,gen] == 0, na.rm = T)){
+    print("extinct")
+    break} #break if extinct
+    
+  else if(any(X > 10^6, na.rm = T)){
+    print("too big") 
+    print(gen)
+    print(paste("At gen", gen, "with last type", ))
+    break} #break if really large
+  }
+
+
+```
+
+
+```{r test}
+N = bp_deltaR(Rwt = 1.3, deltaR = 0.1, Rfinal = 3, mu = 10^-3, gens = 1000)
+
+nrow(N)
+
+N[3 ,]
+```
