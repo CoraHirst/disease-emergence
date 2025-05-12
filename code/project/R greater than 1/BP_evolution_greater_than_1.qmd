@@ -282,3 +282,13 @@ mean_emergence_size = mean(emergence_size)
 mean_extinction_gens = mean(extinction_gens)
 mean_extinction_size = mean(extinction_size)
 ```
+
+
+Next steps - 
+run simulation for varying wild type and delta R. 
+
+Then add 1 or 2 other mus. 
+
+Figuring out how to do this timely is not trivial! I bet I could get away with 100 spillovers...
+
+```{}
