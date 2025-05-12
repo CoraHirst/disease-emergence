@@ -12,6 +12,7 @@ library(tidyverse) #for easy manipulation of data structures
 library(gridExtra) #for arrangeing plotsx
 library(RColorBrewer) #for colors
 library(gridExtra) #for plotting multiple plots in one figure
+library(parallel)
 
 source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
 
@@ -245,7 +246,7 @@ while(c<=spills){
   
   #### report
     # last type 
-    rows_greaterthan_0 <- which(apply(X > 0, 1, any))
+    #rows_greaterthan_0 <- which(apply(X > 0, 1, any))
     
     
   if(all(X[,gen] == 0, na.rm = T)){
@@ -291,4 +292,206 @@ Then add 1 or 2 other mus.
 
 Figuring out how to do this timely is not trivial! I bet I could get away with 100 spillovers...
 
-```{}
+# Parallelization
+
+## 
+Each simulation takes quite a bit of time. I would like to run them in parallel. First, I'd like to change my function to use `apply` instead of a `while` loop. 
+
+I am going to create a function that returns 3 numbers: 
+
+1) `type`, binary 1 or 0, depending on whether the disease has emerged (1) or gone extinct (0),
+2) `gens`, the number of generations before emergence or extinction, and 
+3) `size` the total number of infections before emergence or extinction.
+
+```{r iterable-function}
+#function for a single iteration of bp 
+iterable_bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
+  #parms
+   # calculate number of types
+  m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
+  # define vector of R0 for each type 
+  R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
+  # define empty matrix for storing numbers of individuals of each type over gens generations
+  X = matrix(nrow = m, ncol = gens+1) #rows are types over time, columns are individuals of each type at given time
+ 
+  ##### initial conditions
+  init = c(1, rep(0, m-1)) # start with one individual of wt and no individuals of any other type
+  X[,1] = init # add to matrix for gen 0
+ 
+  #### simulation
+  # stochastic simulation summing random variables each gen
+  for(gen in 2:gens){
+    X[1,gen] = sum(rpois(n = X[1,gen-1], lambda = (1-mu)*R0[1])) # add X1,gen-1 random samples from pois dist with lambda = (1-u)R0(i)
+    for(i in 2:(m-1)){
+      X[i,gen] = sum(rpois(n = X[i,gen-1], lambda = (1-mu)*R0[i])) + # contributions from type i
+        sum(rpois(n = X[i-1,gen-1], mu*R0[i-1])) #mutants from type i-1
+    }
+    X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
+      sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
+  
+  #### report
+  if(all(X[,gen] == 0, na.rm = T)){
+    type = 0
+    size = sum(X, na.rm = T)
+    generation = gen
+    break} #break if extinct
+    
+  else if(any(X[m,] > 0, na.rm = T)){
+    type = 1
+    size = sum(X, na.rm = T)
+    generation = gen
+    break} #break if emerges at high R
+    
+  }
+  #return a vector with type, gens, size. these will be concatenated into a single dataframe row-wise after all iterations
+  iteration_result = c(type, size, generation)
+  return(iteration_result)
+}
+
+
+
+```
+
+```{r sim-setup}
+# Parms
+spills = 10 #number of spillovers 
+
+Rwt = 1.3 #wt r
+deltaR = 0.3 #change in r with mut  
+Rfinal = 3 #r of final type 
+mu = 10^-3 #mutation rate
+gens = 100 #number of generations to run each sim
+
+```
+
+Lets test out 10 iterations for a single `Rwt` and `deltaR` combination.
+
+```{r test-single-regime}
+#run simulation spills times using replicate and save output in a dataframe
+system.time(sim1 <- mclapply(1:spills, function(i) {iterable_bp_deltaR(Rwt=Rwt, 
+                                          deltaR=deltaR, 
+                                          Rfinal=Rfinal, 
+                                          mu=mu,
+                                          gens=gens)}))
+sim1 = do.call(rbind,sim1) %>% as.data.frame()
+ 
+#rename columns
+colnames(sim1) = c("type", "size", "generation")
+```
+                   
+
+For each parameter combination, we would like to reduce this data frame into a vector of six numbers - probability of emergence or extinction, average outbreak size if emerged or if extinct, and number of generations until emergence or extinction. We would also like to know the values of the changing parameters, $Rwt$ and $deltaR$, so we will add those
+
+```{r metrics}
+#output vector 
+p_emerge = sum(sim1$type)/spills
+p_extinct = 1 - p_emerge
+
+#outbreak sizes
+mean_size_emerge = sim1 %>%
+  filter(type == 1) %>%
+  pull(size) %>%
+  mean(na.rm = T)
+
+mean_size_extinct = sim1 %>%
+  filter(type == 0) %>%
+  pull(size) %>%
+  mean(na.rm = T)
+
+#number of gens to final
+mean_gens_emerge = sim1%>% 
+  filter(type == 1) %>%
+   pull(generation) %>%
+  mean(na.rm = T)
+
+mean_gens_extinct = sim1 %>%
+  filter(type == 0) %>%
+  pull(generation) %>%
+  mean(na.rm = T)
+
+# dataframe
+slightly_supercritical = data.frame("Rwt" = Rwt, 
+                                    "deltaR" = deltaR,
+                                    "Pemerge" = p_emerge,
+                                    "Pextinct" = p_extinct,
+                                    "mean_size_emerge" = mean_size_emerge,
+                                    "mean_size_extinct" = mean_size_extinct,
+                                    "mean_gens_emerge" = mean_gens_emerge,
+                                    "mean_gens_extinct" = mean_gens_extinct)
+
+
+```
+
+Putting these chunks together into a single function that takes in a matrix of Rwt and deltaR combinations and outputs the 6 metrics: 
+
+```{r}
+#define simulation for parallelization with mclapply
+bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens, spills){
+  sim1 = mclapply(1:spills,  function(i) { #mclapply returns a list of vectors 
+                 iterable_bp_deltaR(Rwt=Rwt, 
+                              deltaR=deltaR, 
+                              Rfinal=Rfinal, 
+                              mu=mu,
+                              gens=gens)}) 
+sim1 = do.call(rbind,sim1) %>% as.data.frame() #here we collapse that list into a dataframe where each observation is one iteration
+#rename columns
+colnames(sim1) = c("type", "size", "generation") #rename Df collumns for easy access
+
+# dataframe
+slightly_supercritical = c("Rwt" = Rwt, # report averages across all iterations such that each regime gets a single observation
+                                    "deltaR" = deltaR,
+                                    "Pemerge" = sum(sim1$type)/spills,
+                                    "Pextinct" = 1 - sum(sim1$type)/spills,
+                                    "mean_size_emerge" = sim1 %>%
+                                                          filter(type == 1) %>%
+                                                          pull(size) %>%
+                                                          mean(na.rm = T),
+                                    "mean_size_extinct" = sim1 %>%
+                                                          filter(type == 0) %>%
+                                                          pull(size) %>%
+                                                          mean(na.rm = T),
+                                    "mean_gens_emerge" = sim1 %>%
+                                                          filter(type == 1) %>%
+                                                          pull(generation) %>%
+                                                          mean(na.rm = T),
+                                    "mean_gens_extinct" = sim1 %>%
+                                                          filter(type == 0) %>%
+                                                          pull(generation) %>%
+                                                          mean(na.rm = T))
+return(slightly_supercritical)
+
+}
+
+```
+
+
+# Running across parameter combinations
+
+We would like to see how emergence probability, time to emergence, and total size changes with the wildtype R of the spilled over variant when each infection gives rise to at least one but no more than two secondary infections on average. That is, $1 \le R < 2.$
+
+```{r params}
+# Parms
+spills = 5 #number of spillovers 
+
+#Rwt = seq(1.3,1.5,by = 0.2) #wt r
+#deltaR = seq(0.1, 0.3, by = 0.2) #change in r with mut  
+Rwt = c(1.3,1.5)
+deltaR = c(0.1,0.3)
+Rfinal = 3 #r of final type 
+mu = 10^-3 #mutation rate
+gens = 100 #number of generations to run each sim
+
+#parameter regime matrix
+regimes = expand.grid(Rwt, deltaR)
+
+regimes
+```
+
+```{r simulate}
+#run 
+system.time(run <- apply(regimes, 1, FUN = function(x){bp_deltaR(Rwt=x[1], deltaR=x[2], Rfinal=Rfinal, mu=mu, gens=gens, spills=spills)}) %>% t() %>% as.data.frame())
+
+
+
+
+```
