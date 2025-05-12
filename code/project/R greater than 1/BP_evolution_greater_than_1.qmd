@@ -26,12 +26,13 @@ The objective of this document is to develop a function to simulate the multi-st
 
 # Model 
 
-```{r bp-function}
-### define function
 
-bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
+```{r bp-testfunction}
+### define function
+bp_testdeltaR = function(Rwt, deltaR, Rfinal, mu, gens){
   ##### calculate parameters
   # caluclate number of types
+   # caluclate number of types
   m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
   # define vector of R0 for each type 
   R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
@@ -53,12 +54,20 @@ bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
     X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
       sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
   
-  if(all(X == 0)){
+  #### report
+    # last type 
+    rows_greaterthan_0 <- which(apply(X > 0, 1, any))
+    
+    
+  if(all(X[,gen] == 0, na.rm = T)){
     print("extinct")
+    print(paste("At gen", gen, "with last type", max(rows_greaterthan_0), "of", m, "and total", sum(X, na.rm = T)))
     break} #break if extinct
-  else if(any(X > 10^6, na.rm = T)){
-    print("too big") 
-    break} #break if really large
+    
+  else if(any(X[m,] > 0, na.rm = T)){
+    print("emergent") 
+    print(paste("At gen", gen, "with last type", max(rows_greaterthan_0), "of", m, "and total", sum(X, na.rm = T)))
+    break} #break if emerges at high R
   }
   return(X)
 }
@@ -66,12 +75,12 @@ bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
 
 ```
 
-```{r}
+```{r run-sim}
 # parms
-Rwt = 1.3
-deltaR = 0.1 
+Rwt = 1.5
+deltaR = 0.3 
 Rfinal = 3
-mu = 10^-3 
+mu = 10^-3
 gens = 1000
 
 
@@ -98,25 +107,178 @@ gens = 1000
     X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
       sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
   
+  #### report
+    # last type 
+    rows_greaterthan_0 <- which(apply(X > 0, 1, any))
+    
+    
   if(all(X[,gen] == 0, na.rm = T)){
     print("extinct")
+    print(paste("At gen", gen, "with last type", max(rows_greaterthan_0), "of", m, "and total", sum(X, na.rm = T)))
     break} #break if extinct
     
-  else if(any(X > 10^6, na.rm = T)){
-    print("too big") 
-    print(gen)
-    print(paste("At gen", gen, "with last type", ))
-    break} #break if really large
+  else if(any(X[m,] > 0, na.rm = T)){
+    print("emergent") 
+    print(paste("At gen", gen, "with last type", max(rows_greaterthan_0), "of", m, "and total", sum(X, na.rm = T)))
+    break} #break if emerges at high R
   }
+
+### cool 
+```
+
+
+```{r run-testfunction}
+# parms
+Rwt = 1.3
+deltaR = 0.3
+Rfinal = 3
+mu = 10^-3
+gens = 100
+
+#run sim
+N = bp_deltaR(Rwt = Rwt, deltaR = deltaR, Rfinal = Rfinal, mu = mu, gens = 100)
 
 
 ```
 
+# Probably and time to emergence *per intro*
 
-```{r test}
-N = bp_deltaR(Rwt = 1.3, deltaR = 0.1, Rfinal = 3, mu = 10^-3, gens = 1000)
+I will run the simulation 100 and calculate the fraction of emergent versus extinct spillover events. 
+I will keep track of the total size of the outrbeak (sum of all infections) and the number of generations before the emergence of the highly-transmissible variant. 
 
-nrow(N)
+```{r }
+### define function
+bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
+  ##### calculate parameters
+  # caluclate number of types
+   # caluclate number of types
+  m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
+  # define vector of R0 for each type 
+  R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
+  # define empty matrix for storing numbers of individuals of each type over gens generations
+  X = matrix(nrow = m, ncol = gens+1) #rows are types over time, columns are individuals of each type at given time
+ 
+  ##### initial conditions
+  init = c(1, rep(0, m-1)) # start with one individual of wt and no individuals of any other type
+  X[,1] = init # add to matrix for gen 0
+ 
+  #### simulation
+  # stochastic simulation summing random variables each gen
+  for(gen in 2:gens){
+    X[1,gen] = sum(rpois(n = X[1,gen-1], lambda = (1-mu)*R0[1])) # add X1,gen-1 random samples from pois dist with lambda = (1-u)R0(i)
+    for(i in 2:(m-1)){
+      X[i,gen] = sum(rpois(n = X[i,gen-1], lambda = (1-mu)*R0[i])) + # contributions from type i
+        sum(rpois(n = X[i-1,gen-1], mu*R0[i-1])) #mutants from type i-1
+    }
+    X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
+      sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
+  
+  #### report
+    # last type 
+    rows_greaterthan_0 <- which(apply(X > 0, 1, any))
+    
+    
+  if(all(X[,gen] == 0, na.rm = T)){
+    extinct = extinct + 1
+    extinction_size = c(extinction_size, sum(X))
+    extinction_gen = c(extinction_gen, gen)
+    break} #break if extinct
+    
+  else if(any(X[m,] > 0, na.rm = T)){
+    emerged = emerged + 1
+    emergence_size = c(emergence_size, sum(X))
+    emergence_gen = c(emergence_gen, gen)
+    break} #break if emerges at high R
+  }
+  return(X)
+}
+```
 
-N[3 ,]
+```{r sim-setup}
+# Parms
+spills = 1000 #number of spillovers 
+
+Rwt = 1.3 #wt r
+deltaR = 0.3 #change in r with mut  
+Rfinal = 3 #r of final type 
+mu = 10^-3 #mutation rate
+gens = 100 #number of generations to run each sim
+
+# Storage
+## emergence
+emerged = 0 #counter to keep track of emergence events
+emergence_size = c(0) # vector to keep track of final sizes of emergence events
+emergence_gens = c(0) # vector to keep track of generation at which final variant emerges
+## extinction
+extinct = 0 #counter to keep track of extinction events
+extinction_size = c(0) # vector to keep track of final sizes of extinction events
+extinction_gens = c(0) # vector to keep track of generation at which extinction occurs
+
+
+```
+
+```{r run-sim-perintro}
+c = 1
+while(c<=spills){
+  #parms
+   # caluclate number of types
+  m = ceiling((Rfinal-Rwt)/deltaR) + 1 #divide interval into m-1 segments of delta R length and add 1 for initial type
+  # define vector of R0 for each type 
+  R0 = Rwt + (0:(m))*deltaR # add the changes from wtR0 to give R0 of each variant
+  # define empty matrix for storing numbers of individuals of each type over gens generations
+  X = matrix(nrow = m, ncol = gens+1) #rows are types over time, columns are individuals of each type at given time
+ 
+  ##### initial conditions
+  init = c(1, rep(0, m-1)) # start with one individual of wt and no individuals of any other type
+  X[,1] = init # add to matrix for gen 0
+ 
+  #### simulation
+  # stochastic simulation summing random variables each gen
+  for(gen in 2:gens){
+    X[1,gen] = sum(rpois(n = X[1,gen-1], lambda = (1-mu)*R0[1])) # add X1,gen-1 random samples from pois dist with lambda = (1-u)R0(i)
+    for(i in 2:(m-1)){
+      X[i,gen] = sum(rpois(n = X[i,gen-1], lambda = (1-mu)*R0[i])) + # contributions from type i
+        sum(rpois(n = X[i-1,gen-1], mu*R0[i-1])) #mutants from type i-1
+    }
+    X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
+      sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
+  
+  #### report
+    # last type 
+    rows_greaterthan_0 <- which(apply(X > 0, 1, any))
+    
+    
+  if(all(X[,gen] == 0, na.rm = T)){
+    extinct = extinct + 1
+    extinction_size = c(extinction_size, sum(X, na.rm = T))
+    extinction_gens = c(extinction_gens, gen)
+    break} #break if extinct
+    
+  else if(any(X[m,] > 0, na.rm = T)){
+    emerged = emerged + 1
+    emergence_size = c(emergence_size, sum(X, na.rm = T))
+    emergence_gens = c(emergence_gens, gen)
+    break} #break if emerges at high R
+  }
+  if(c %% 10 == 0){
+  print(paste("done", c))
+  }
+  c = c+1
+  
+}
+
+```
+
+```{r analysis}
+#### fraction emerged and extinct
+p_emerge = emerged/spills
+p_extinct = extinct/spills
+
+#average number of gens to and size at emergence 
+mean_emergence_gens = mean(emergence_gens)
+mean_emergence_size = mean(emergence_size)
+
+#average number of gens to and size after extinction
+mean_extinction_gens = mean(extinction_gens)
+mean_extinction_size = mean(extinction_size)
 ```
