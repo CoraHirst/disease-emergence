@@ -197,7 +197,7 @@ bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
 
 ```{r sim-setup}
 # Parms
-spills = 1000 #number of spillovers 
+spills = 10 #number of spillovers 
 
 Rwt = 1.3 #wt r
 deltaR = 0.3 #change in r with mut  
@@ -329,6 +329,12 @@ iterable_bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
     X[m,gen] = sum(rpois(n = X[m,gen-1], lambda = R0[m])) + #contribution from type m
       sum(rpois(n=X[m-1,gen-1],lambda = mu*R0[m-1])) #contribution from type m-1
   
+  if(gen == gens){
+    type = 2
+    size = sum(X, na.rm = T)
+    generation = gen
+  }  
+    
   #### report
   if(all(X[,gen] == 0, na.rm = T)){
     type = 0
@@ -342,7 +348,14 @@ iterable_bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
     generation = gen
     break} #break if emerges at high R
     
+    else if(sum(X, na.rm = T) > 10^9){
+    type = 1
+    size = NaN
+    generation = NaN #break if too big
+    break}
+    
   }
+  
   #return a vector with type, gens, size. these will be concatenated into a single dataframe row-wise after all iterations
   iteration_result = c(type, size, generation)
   return(iteration_result)
@@ -357,7 +370,7 @@ iterable_bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens){
 spills = 10 #number of spillovers 
 
 Rwt = 1.3 #wt r
-deltaR = 0.3 #change in r with mut  
+deltaR = 0.1 #change in r with mut  
 Rfinal = 3 #r of final type 
 mu = 10^-3 #mutation rate
 gens = 100 #number of generations to run each sim
@@ -435,7 +448,7 @@ bp_deltaR = function(Rwt, deltaR, Rfinal, mu, gens, spills){
                               gens=gens)}) 
 sim1 = do.call(rbind,sim1) %>% as.data.frame() #here we collapse that list into a dataframe where each observation is one iteration
 #rename columns
-colnames(sim1) = c("type", "size", "generation") #rename Df collumns for easy access
+colnames(sim1) = c("type", "size", "generation") #rename Df columns for easy access
 
 # dataframe
 slightly_supercritical = c("Rwt" = Rwt, # report averages across all iterations such that each regime gets a single observation
@@ -471,12 +484,12 @@ We would like to see how emergence probability, time to emergence, and total siz
 
 ```{r params}
 # Parms
-spills = 5 #number of spillovers 
+spills = 1000 #number of spillovers 
 
 #Rwt = seq(1.3,1.5,by = 0.2) #wt r
 #deltaR = seq(0.1, 0.3, by = 0.2) #change in r with mut  
-Rwt = c(1.3,1.5)
-deltaR = c(0.1,0.3)
+Rwt = seq(1.2, 2, by = 0.05)
+deltaR = seq(0.25, 1, by = 0.25)
 Rfinal = 3 #r of final type 
 mu = 10^-3 #mutation rate
 gens = 100 #number of generations to run each sim
@@ -489,9 +502,15 @@ regimes
 
 ```{r simulate}
 #run 
-system.time(run <- apply(regimes, 1, FUN = function(x){bp_deltaR(Rwt=x[1], deltaR=x[2], Rfinal=Rfinal, mu=mu, gens=gens, spills=spills)}) %>% t() %>% as.data.frame())
+system.time(run <- apply(regimes, 1, FUN = function(x){bp_deltaR(Rwt=as.numeric(x[1]), deltaR=as.numeric(x[2]), Rfinal=Rfinal, mu=mu, gens=gens, spills=spills)}) %>% t())
+
+run = run %>% as.data.frame()
 
 
+# Intere
+# 
+# 
 
-
+ggplot() +
+  geom_line(data = run, aes(x = Rwt, y = Pemerge, group = factor(deltaR), col = factor(deltaR))) 
 ```
