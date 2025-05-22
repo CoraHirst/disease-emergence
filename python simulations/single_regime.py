@@ -63,3 +63,12 @@ outcomes # lets see how we did
 
 #### still slow - two days for 200 sims vs 3.6 days for 68 though so there's that!
 
+
+#### save output to outcomes.txt
+file_path = "outcomes.txt"
+
+with open(file_path, 'w') as file:
+    for item in outcomes:
+        file.write(str(item) + '\n')
+        
+# chill for tonight! But then lets get on with the rest of this. 
