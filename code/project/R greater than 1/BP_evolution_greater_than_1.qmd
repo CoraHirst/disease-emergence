@@ -1,6 +1,6 @@
 ---
-title: "Exploring waning population immunity to Smallpox in the Congo"
-subtitle: "Doc.1 How to best model the decay of immunity to smallpox at the population level after ceasing vaccination"
+title: "Exploring probability of evolution to high transmissibility after emergence"
+subtitle: "Doc.1 How to best model the probability of evolution to high transmission when R > 1"
 format: html
 ---
 
@@ -9,7 +9,6 @@ format: html
 library(ggplot2) #for plotting
 library(here) #for easy local path referencing
 library(tidyverse) #for easy manipulation of data structures
-library(gridExtra) #for arrangeing plotsx
 library(RColorBrewer) #for colors
 library(gridExtra) #for plotting multiple plots in one figure
 library(parallel)
@@ -507,10 +506,50 @@ system.time(run <- apply(regimes, 1, FUN = function(x){bp_deltaR(Rwt=as.numeric(
 run = run %>% as.data.frame()
 
 
-# Intere
-# 
-# 
+# Save output 
+file = here("results", "analysis", "R greater than 1", "R_sim_output.csv")
+write.csv(run, file, row.names = F)
 
-ggplot() +
-  geom_line(data = run, aes(x = Rwt, y = Pemerge, group = factor(deltaR), col = factor(deltaR))) 
+```
+
+```{r plot-results}
+plot = ggplot() +
+  geom_line(data = run, aes(x = Rwt, y = Pemerge, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = palette("set2")) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save plot
+file = here("results", "analysis", "R greater than 1", "fig_P_high_transmission.png")
+ggsave(filename = file, plot)
+
+```
+
+- looks like evolution to high transmissibility does not depend on number of mutations, just on how much greater than 1 R is.
+
+- really I should simulate Rs realy close to 1 because thats where the biggest drops are
+
+Lets look at size at emergence. 
+
+```{r plot-size}
+plot = ggplot() +
+  geom_line(data = run, aes(x = Rwt, y = log10(mean_size_emerge), group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = palette("set2")) +
+  labs(x = "initial R", y = "log10 Size", col = "Increase with Mutation", title = "Size at emergent high transmissibility, spillover R > 1")
+
+#save plot
+file = here("results", "analysis", "R greater than 1", "fig_size_high_transmission.png")
+ggsave(filename = file, plot)
+
+plot = ggplot() +
+  geom_line(data = run, aes(x = Rwt, y = log10(mean_size_extinct), group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = palette("set2")) +
+  labs(x = "initial R", y = "log10 Size", col = "Increase with Mutation", title = "Size at extinction before high transmissibility, spillover R > 1")
+
+#save plot
+file = here("results", "analysis", "R greater than 1", "fig_size_extinction.png")
+ggsave(filename = file, plot)
+
 ```

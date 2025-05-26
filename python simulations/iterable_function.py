@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Sun May 18 12:46:14 2025
@@ -42,7 +41,7 @@ def iterable_bp_deltaR(parm_vector): # model goes to evolution of high transmiss
         X[i,gen] = sum(random.poisson(lam = (1-mu)*R0[i], size = X[i,gen-1])) + sum(random.poisson(lam = mu*R0[i-1], size = X[i-1,gen-1]))
       X[m-1,gen] = sum(random.poisson(lam = mu*R0[m-2], size = X[m-2,gen-1])) + sum(random.poisson(lam = R0[m-1], size = X[m-1, gen-1]))
      
-      if gen == gens: #if we reach the end of sim before extinction or emergence, typ = 1 (we can discuss this later) 
+      if gen == (gens-1): #if we reach the end of sim before extinction or emergence, typ = 1 (we can discuss this later) 
         typ = 1
         size = np.sum(X)
         generation = gen

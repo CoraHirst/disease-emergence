@@ -1,0 +1,74 @@
+---
+title: "Python Simulation Results, R > 1"
+subtitle: "Doc.2 Python simulation results - evolution of Mpox to high transmissibility when spillover R > 1"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+The objective of this document is to process and analyze the output of a python simulation of the multi-step branching process of the adaptation of a virus with a near critical (though slightly greater than 1) $R_0$ out of a zoonotic source. 
+
+# Loading simulation results
+
+The output of the python simulation is stored in `python simulations/output.csv`. This is a `.csv` file containing a dataframe of statistics calculated from 1000 iterations of each of 200 parameter combinations. These parameter regimes simulated the branching process with different combinations of the spillover R, $Rwt$, of the disease and the step increase in transmissibility with a given mutation, $deltaR$. We assumed the final R of highest transmissibility would be 3, and that a beneficial mutation would emerge and transmit with a probability of 1/1000 infections ($\mu = 10^{-3}$). 
+
+```{r load-sim-results}
+results = read.csv(here("python simulations", "output.csv"))
+
+```
+
+Now lets go ahead and plot the probability of evolution to high transmissibility.
+
+```{r plot-pHigh}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+```
+
+And lets plot the number of generations at 1) emergence and 2) extinction. 
+
+```{r plot-generations}
+plot2 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = Emergent_generation, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Generation of emergence", col = "Increase with Mutation", title = "Mean generation of emergence, spillover R > 1")
+
+plot3 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = Extinct_generation, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Generation of extinction", col = "Increase with Mutation", title = "Mean generation of extinction, spillover R > 1")
+
+grid.arrange(plot2,plot3)
+```
+
+Finally, lets plot the size of the extinction events. Unfortunately I was dumb and didn't take into account that calculating the mean emergent size with NaNs requires an explicit ignorance of NaNs in python. Ugh. 
+
+```{r plot-size}
+plot4 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = Extinct_size, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Size at extinction", col = "Increase with Mutation", title = "Mean size at extinction, spillover R > 1")
+
+plot4
+```

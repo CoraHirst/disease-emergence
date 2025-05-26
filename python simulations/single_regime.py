@@ -33,7 +33,7 @@ def single_regime(Rwt, deltaR, Rfinal, mu, gens, spills):
     
             resultsDF = pd.DataFrame(np.stack(results), columns = ['outcome', 'total','generation'])
     
-            info = {'pEmergent': resultsDF[resultsDF['outcome'] == 1]['outcome'].sum()/len(resultsDF),'pExtinct': 1 - ((resultsDF[resultsDF['outcome'] == 1])['outcome'].sum()/len(resultsDF)),'Emergent_size': resultsDF[resultsDF['outcome'] == 1]['total'].mean(),'Extinct_size': resultsDF[resultsDF['outcome'] == 0]['total'].mean(),'Emergent_generation': resultsDF[resultsDF['outcome'] == 1]['generation'].mean(),'Extinct_generation': resultsDF[resultsDF['outcome'] == 0]['generation'].mean()}
+            info = {'nTooBig':len(resultsDF[resultsDF['total'] == np.nan]),'pUnfinished':(len(resultsDF[resultsDF['outcome'] == 2])/len(resultsDF)), 'pEmergent': resultsDF[resultsDF['outcome'] == 1]['outcome'].sum()/len(resultsDF),'pExtinct': (len(resultsDF[resultsDF['outcome'] == 0])/len(resultsDF)),'Emergent_size': resultsDF[resultsDF['outcome'] == 1]['total'].mean(skipna=True),'Extinct_size': resultsDF[resultsDF['outcome'] == 0]['total'].mean(skipna = True),'Emergent_generation': resultsDF[resultsDF['outcome'] == 1]['generation'].mean(skipna=True),'Extinct_generation': resultsDF[resultsDF['outcome'] == 0]['generation'].mean(skipna=True)}
 
             return info
 
@@ -52,23 +52,40 @@ for regime in range(len(parms_list)):
 
 
 
+
 outcomes # lets see how we did 
 
-
+        
+# chill for tonight! But then lets get on with the rest of this. 
 #### moving on 
 #### we need to concatenate all dictionaries into a data frame with keys as the column titles 
 #### then we need to add two more columns by column binding the ind_parms array so that we know what our parameters were!
 #### ideally we can try to speed it up even more so that we can run more iterations per regime
 #### ultimately I'd like to make it modular enough that we can run it all straight from command line. But this is great! 
 
-#### still slow - two days for 200 sims vs 3.6 days for 68 though so there's that!
+#### still slow - three days for 200 sims vs 3.6 days for 68 though so there's that!
+
+# save output as dataframe
+outcomesDF = pd.DataFrame(outcomes)
+#save parms as dataframe
+parmsDF = pd.DataFrame(parms_list, columns = ['Rwt', 'deltaR', 'Rfinal', 'mu', 'allottedGens', 'spills'])
 
 
-#### save output to outcomes.txt
-file_path = "outcomes.txt"
+#combine columnwise outcomes and parms for saving to analyse in r
+outputDF = pd.concat([parmsDF, outcomesDF], axis = 1)
 
-with open(file_path, 'w') as file:
-    for item in outcomes:
-        file.write(str(item) + '\n')
+#### save output dataframe to outcomes.csv
+file_path = "output2.csv"
+outputDF.to_csv(file_path, index = False) #index=false prevents the csv file from writing the line indices
+
+
+
+# code for saving list of dictionaries to a text file
+#with open(file_path, 'w') as file: 
+  #  for item in outcomes:
+     #   file.write(str(item) + '\n')
         
-# chill for tonight! But then lets get on with the rest of this. 
+######## no i did a dumb thing I have to take the mean of emergence size IGNORING NAs
+
+
+
