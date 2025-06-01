@@ -11,6 +11,7 @@ library(here) #for easy local path referencing
 library(tidyverse) #for easy manipulation of data structures
 library(RColorBrewer) #for colors
 library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
 
 # colors for plotting
 num_cols = 20
@@ -35,13 +36,61 @@ Now lets go ahead and plot the probability of evolution to high transmissibility
 ```{r plot-pHigh}
 # plot probability of evolution to high R
 plot = ggplot() +
-  geom_line(data = results, aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
   theme_bw() +
   scale_color_manual(values = my.colors) +
   labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
 
 plot
 ```
+Here we can compare this to the probability that the process does not go extinct before the second type emerges (the extinction probability for a GW process with lambda = Rwt)
+
+```{r non-extinction probability}
+#nonlinear equation solver to solve for fixed point of the generating function for the branching process
+
+## define branching process generating function for offspring distribution
+bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x} #fixed point solution will be this function set to 0
+
+## define initial conditions 
+init = 1 #start with single spillover infection meep meep
+
+## start fixed point guess
+xstart = 0.5 #50 percent will go extinct so lets see
+
+## solve for non extinction probability (1-Pextinction)
+non_extinction = function(Rwt) {
+  Rwt = Rwt #set Rwt
+  return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
+  }
+
+# solve to plot
+rwt = seq(1.01, 2, by = 0.01)
+pNE = NaN
+for(i in 1:length(rwt)){
+  Rwt = rwt[i]
+  pNE[i] = non_extinction(Rwt)
+}
+
+#solve 1-1/r0 
+ap = 1-(1/rwt)
+
+```
+
+Now we can plot our predictions based on the non-extinction probability of a branching process starting with a single case with the spillover Rwt. 
+
+```{r plot-pHigh-preds}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = rwt, y = pNE)) +
+  geom_line(aes(x=rwt, y = ap), col = "red") +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+```
+
 
 And lets plot the number of generations at 1) emergence and 2) extinction. 
 
@@ -65,7 +114,7 @@ Finally, lets plot the size of the extinction events. Unfortunately I was dumb a
 
 ```{r plot-size}
 plot4 = ggplot() +
-  geom_line(data = results, aes(x = Rwt, y = Extinct_size, group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results, aes(x = Rwt, y = log(Extinct_size), group = factor(deltaR), col = factor(deltaR))) +
   theme_bw() +
   scale_color_manual(values = my.colors) +
   labs(x = "initial R", y = "Size at extinction", col = "Increase with Mutation", title = "Mean size at extinction, spillover R > 1")
