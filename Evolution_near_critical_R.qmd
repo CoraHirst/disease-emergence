@@ -70,5 +70,43 @@ ggplot() +
 
 # Plotting the probability of evolving high transmissibility when $R>1$
 
+The approximation asserts that the non-extinction probability of a singletype BP starting with a wildtype R of the first type will be the probability of emergence of the highly transmissible type (we can talk about the time it would take to reach that transmissibility later).
+
 The stochastic models were developed in `code\project\R greater than 1\BP_evolution_greater_than_1.qmd` and again in python in `code\project\R greater than 1\python simulations`. The function defining the approximate analytic solution to the branching process model is first introduced in `code\project\R greater than 1\python simulations\BP_evolution_greater_than_1_2.qmd` and is stored in `code\functions\functions.R`.
  
+The function we need is also loaded from `code\functions\functions.R`. 
+
+```{r supercritical}
+# solve to plot
+rwt = seq(1.01, 2, by = 0.01)
+pNE = NaN #vector to store nonextinction probs in 
+for(i in 1:length(rwt)){
+  Rwt = rwt[i]
+  pNE[i] = non_extinction(Rwt)
+}
+
+#plot
+# plot probability of evolution to high R / nonextinction probability for supercritical R singletype
+plot = ggplot() +
+  geom_line(aes(x = rwt, y = pNE)) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+
+```
+
+# plot together: 
+
+The probability of emergence of a highly transmissible virus is approximately the non-extinction probability of a single-type BP starting with a single infection of the first type (wildtype) R when the wildtype R is greater than 1. 
+
+The probability of emergence of a highly transmissible virus when the wildtype R is slightly subcritical requires that the probability of emergence be multiplied by the non-extinction probability of the first supercritical variant. 
+
+I am working on that function here: 
+
+```{r total-prob}
+
+
+
+```

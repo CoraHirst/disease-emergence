@@ -40,3 +40,23 @@ pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   return(prob.emergence) 
 }
 
+
+#nonlinear equation solver to solve for fixed point of the generating function for the single-type branching process with a supercritical R
+## define branching process generating function for offspring distribution
+pEvolution_singletype = function(Rwt) {
+  bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x} #fixed point solution will be this function set to 0
+  
+  ## define initial conditions 
+  init = 1 #start with single spillover infection meep meep
+  
+  ## start fixed point guess
+  xstart = 0.5 #50 percent will go extinct so lets see
+  
+  ## solve for non extinction probability (1-Pextinction)
+    Rwt = Rwt #set wildtype R
+    return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
+  }
+  
+  
+  
+  
