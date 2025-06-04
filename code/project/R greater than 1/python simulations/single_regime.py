@@ -75,7 +75,7 @@ parmsDF = pd.DataFrame(parms_list, columns = ['Rwt', 'deltaR', 'Rfinal', 'mu', '
 outputDF = pd.concat([parmsDF, outcomesDF], axis = 1)
 
 #### save output dataframe to outcomes.csv
-file_path = "output2.csv"
+file_path = "output3.csv"
 outputDF.to_csv(file_path, index = False) #index=false prevents the csv file from writing the line indices
 
 

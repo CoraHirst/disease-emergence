@@ -19,7 +19,7 @@ mu = [10**(-3)] #mutation rate
 gens = [100] #number of generations
 
 #only change Rwt and deltaR with each run
-Rwt = (np.linspace(1.0,2, num = 20 , endpoint = False)).tolist()
+Rwt = (np.linspace(1.0,1.25, num = 20 , endpoint = False)).tolist()
 deltaR = np.linspace(0.1,1,num = 10).tolist()        
 
 

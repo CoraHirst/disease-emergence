@@ -27,7 +27,7 @@ The objective of this document is to process and analyze the output of a python 
 The output of the python simulation is stored in `python simulations/output.csv`. This is a `.csv` file containing a dataframe of statistics calculated from 1000 iterations of each of 200 parameter combinations. These parameter regimes simulated the branching process with different combinations of the spillover R, $Rwt$, of the disease and the step increase in transmissibility with a given mutation, $deltaR$. We assumed the final R of highest transmissibility would be 3, and that a beneficial mutation would emerge and transmit with a probability of 1/1000 infections ($\mu = 10^{-3}$). 
 
 ```{r load-sim-results}
-results = read.csv(here("code", "project", "R greater than 1", "python simulations", "output.csv"))
+results = read.csv(here("code", "project", "R greater than 1", "python simulations", "output2.csv"))
 
 ```
 
@@ -114,12 +114,29 @@ Finally, lets plot the size of the extinction events. Unfortunately I was dumb a
 
 ```{r plot-size}
 plot4 = ggplot() +
-  geom_line(data = results, aes(x = Rwt, y = log(Extinct_size), group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results, aes(x = Rwt, y = log10(Extinct_size), group = factor(deltaR), col = factor(deltaR))) +
   theme_bw() +
   scale_color_manual(values = my.colors) +
   labs(x = "initial R", y = "Size at extinction", col = "Increase with Mutation", title = "Mean size at extinction, spillover R > 1")
 
 plot4
+```
+
+
+I reran and was less stupid so here's emergence.
+
+```{r plot-size-emergence}
+plot5 = ggplot() +
+  geom_point(data = results, aes(x = Rwt, y = log10(Emergent_size), group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results, aes(x = Rwt, y = log10(Emergent_size), group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Size at emergence", col = "Increase with Mutation", title = "Mean size at emergence, spillover R > 1")
+
+plot5
+
+results$
+
 ```
 
 

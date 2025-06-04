@@ -57,6 +57,8 @@ pEvolution_singletype = function(Rwt) {
     return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
   }
   
-  
+
+#fraction to vaccinate to reduce R to some threshold below R=1
+frac_vacc = function(Rt,Reff) {1-(Rt/Reff)}
   
   
