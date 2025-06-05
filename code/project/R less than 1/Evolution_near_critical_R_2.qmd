@@ -14,7 +14,7 @@ library(gridExtra) #for plotting multiple plots in one figure
 library(nleqslv) #for solving nonlinear equations
 
 # colors for plotting
-num_cols = 20
+num_cols = 30
 my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
 ```
 
@@ -91,7 +91,7 @@ for(i in 2:length(emergence_curves)){
 print(plot)
 
 # save 
-file = here("results", "analysis", "fig_scheme_threshold_R.jpg")
+file = here("results", "analysis", "R less than 1", "fig_scheme_threshold_R.jpg")
 ggsave(filename = file, plot = plot)
   
 
@@ -176,7 +176,7 @@ plot = ggplot() +
   theme_classic()
 
 # save 
-file = here("results", "analysis", "fig_threshold_R.jpg")
+file = here("results", "analysis", "R less than 1", "fig_threshold_R.jpg")
 ggsave(filename = file, plot = plot)
   
 ```
@@ -224,7 +224,7 @@ list.fvs.heatmaps = lapply(list.fvs.long, function(df) {
 plot = do.call(grid.arrange, c(list.fvs.heatmaps, top = "Fraction to vaccinate"))
 
 # save 
-file = here("results", "analysis", "fig_threshold_vacc.jpg")
+file = here("results", "analysis", "R less than 1", "fig_threshold_vacc.jpg")
 ggsave(filename = file, plot = plot)
   
 

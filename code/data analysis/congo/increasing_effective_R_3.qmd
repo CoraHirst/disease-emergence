@@ -1,0 +1,126 @@
+---
+title: "Exploring the rate of increase of effective reproductive number of Mpox in the Congo due to loss of Smallpox immunity"
+subtitle: "Plotting the change in Re through time"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(gridExtra) #for arrangeing plotsx
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+
+source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
+
+# colors for plotting
+num_cols = 10
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+We have modeled the waning of immunity at the population level in the Congo from 1980-2023 and projected the waning of immunity at the population level forward to 2080, 100 years after the eradication of and ceasing vaccination against smallpox. 
+
+The goal of this document is to show how the effective reproductive number of a related zoonotic virus - mpox - is expected to decrease solely as a function of the loss of population immunity. We will consider the case where cross-immunity from smallpox infection or vaccination is 100%, as well as when smallpox immunity is imperfectly protective against mpox. 
+
+# Load waning estimates
+
+The projections for the waning of population immunity can be found in `results\data analysis\congo\proportion_immune.csv`. I will load this below:
+
+```{r load-pop-immunity}
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+
+```
+
+# Decay in Smallpox immunity at the population
+
+We estimated the loss in the proportion of individuals born during or before the year 1980 through time using a matrix model approach parameterized by annual demographics reports from the Congo (see `code\data analysis\congo\matrix_model_projections_2.qmd`). The model projects the loss of individuals in the future assuming the exponential growth observed from 1980-2023 continues to 2080. 
+
+We can plot the proportion immune over time as a reminder of what these projections look like: 
+
+```{r plot-immune}
+plot = ggplot() +
+  geom_line(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = prop_immune)) +
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = prop_immune)) +
+  geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = prop_immune), col = "red") +
+  geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = prop_immune), col = "red") +
+  labs(x = "Year", y = "proportion immune, f", title = "decay in Smallpox immunity at the population level") +
+  theme_bw()
+
+#save 
+file = here("results", "data analysis", "congo", "fig_Smallpox_immunity_decay.png")
+ggsave(filename = file, plot = plot)
+```
+
+# Increase in effective reproductive number of Mpox
+
+Below, I will plot the change in the effective reproductive number over time as a function of the loss of smallpox immunity at the population level and the degree of cross-protection conferred by smallpox immunity. This is based on the notion that the effective reproductive number is limited by the density of susceptibles, such that $R_e = R_0(1-f_I(t))$, where $R_0$ is the reproductive number of mpox in a completely vaccinated population and $f_I$ is the portion of individuals immune to mpox as a function of time post smallpox eradication. Note that this assumes perfect cross-protection. 
+
+Because we don't know the effective reproductive number of mpox nor the degree of cross-protection conferred by immunity at time $t$, we can plot the relative change in $R_e$ over time as $\frac{R_e}{R_0} = 1-cf_I$, where $c$ represents the degree of cross-protection conferred by smallpox immunity. Note that $\frac{R_e}{R_0}$ gives a measure of the proximity of the current $R_e$ to mpox's $R_0$. 
+
+```{r calculate-re-r0}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected. 
+
+#define function for cross immunity
+Re_R0_ratio = function(f) {1-c*f}
+
+##create a matrix with year and predicted Re_r0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    f = j*i #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(f)})}) #applying re_r0_ratio function with each c to proportion immune
+
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+
+```
+
+```{r plot-re-r0}
+plot = ggplot() + 
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  scale_color_manual(values = my.colors) +
+  labs(x = "Year", y = "relative effective R, Re/R0", title = "increase in Mpox reproductive number") +
+  theme_bw()
+
+#save 
+file = here("results", "data analysis", "congo", "fig_increase_Mpox_relative_R.png")
+ggsave(filename = file, plot = plot)
+```
+
+and finally, we can plot our estimate $R_e$ given different potential basic reproductive numbers of mpox: 
+
+```{r plot-re}
+#define R0s
+R0s = c(0.95, 1.05,1.1,2)
+
+plot = do.call(grid.arrange, lapply(R0s, FUN = function(R0){
+  ggplot() + 
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = R0*relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = R0*relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = R0*relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = R0*relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+    geom_vline(xintercept = 2023, linetype = "dashed") +
+  scale_color_manual(values = my.colors) +
+  labs(x = "Year", y = "effective R, Re", title = paste("increase in Mpox reproductive number when R0 =", R0)) +
+  theme_bw()
+}))
+
+#save 
+file = here("results", "data analysis", "congo", "fig_increase_Mpox_effective_R.png")
+ggsave(filename = file, plot = plot)
+```

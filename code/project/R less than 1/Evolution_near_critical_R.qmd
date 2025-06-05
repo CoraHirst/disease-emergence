@@ -167,6 +167,9 @@ We can multiply the probability of a subcritical R emerging with a single infect
 pHigh.Transmission = pHigh.Transmission %>%
   mutate("Psubcritical_evolution" = pNE * P.Emergence)
 
+###add r greater than 1
+pEvolution = rbind(pHigh.Transmission %>% select("R0", "Psubcritical_evolution"), data.frame("R0" = rwt, "Psubcritical_evolution" = pNE)) %>% as.data.frame()
+
 ```
 
 Finally, we can put together our plot with both subcritical and supercritical Rs, showing the probability that an infection with some near-critical R evolves high transmissibility:
@@ -174,11 +177,9 @@ Finally, we can put together our plot with both subcritical and supercritical Rs
 ```{r total-probs}
 ### 
 plot = ggplot() +
-  geom_line(aes(x = rwt, y = log10(pNE))) +
-  geom_line(data = pHigh.Transmission, aes(x = R0, y = log10(Psubcritical_evolution))) +
-  geom_line(data = pHigh.Transmission, aes(x = R0, y = log10(P.Emergence))) +
+  geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution))) +
   scale_y_continuous(limits = c(-6, -.1)) +
-  scale_x_continuous(limits = c(.7,1.1)) +
+  scale_x_continuous(limits = c(.7,1.25)) +
   labs(x = "Rwt", y = "Probability of High Transmissibility", title = paste("Mu", mu, "deltaR", delta_Rs[1])) +
   theme_classic()
 
