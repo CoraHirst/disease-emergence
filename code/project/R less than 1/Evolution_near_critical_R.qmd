@@ -108,7 +108,7 @@ I am working on that function here:
 
 ```{r probs-emergence}
 ## parameters
-R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 delta_Rs = c(0.1) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
@@ -138,10 +138,11 @@ probs.emergence.deltaR$delta_R = as.numeric(probs.emergence.deltaR$delta_R)
 ```{r probs-evoltuion}
 # calculate first supercritical R for each starting type 
 supercrit_R = function(Rwt, deltaR){
-  m = ceiling((((1+10^-12)-Rwt)/deltaR) + 1) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  m = ceiling(-log10(Rwt)/deltaR) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
    ### define R0 vector 
-  return(Rwt + (m-1)*deltaR) # add the changes from wtR0 to give R0 of first supercritical variant
+  return(Rwt*(1+deltaR)^(m-1)) # add the changes from wtR0 to give R0 of first supercritical variant
 }
+
 
 # add first supercritical R to DF
 pHigh.Transmission = probs.emergence.deltaR %>%

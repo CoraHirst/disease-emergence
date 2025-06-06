@@ -5,7 +5,7 @@ pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   m = ceiling((((1+10^-12)-R_wt)/delta_R) + 1) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
   
   ### define R0 vector 
-  R0 = R_wt + (0:(m-1))*delta_R # add the changes from wtR0 to give R0 of each variant
+  R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
   R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
   
   ### define probability of emergence
