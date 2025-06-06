@@ -221,6 +221,6 @@ plot
 This one makes sense, because a lot of the sizes get too big and go extinct or don't get big at all, so the "sample size" when taking the mean changes. 
 
 ```{r plot-generation-emergence-smallR}
-
+Test
 
 ```
