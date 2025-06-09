@@ -34,9 +34,9 @@ Here, I am plotting for a range of $\Delta R$ jump sizes in transmissibility wit
 
 ```{r subcritical}
 ## parameters
-R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.0, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
-delta_Rs = c(.05,.1,.25,.5,1) #how many types? m-1 mutations required, meaning m-2 intermediate types
+delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
 
 ## matrix to store emergence probabilities 
@@ -62,10 +62,11 @@ plot = ggplot() +
           geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R)) + #plot p emergence as function of R_wt for each m
           theme_bw() + #white background with grey gridlines
           labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(Delta*R)) + #axis and title labels
-          scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
-          coord_cartesian(ylim = c(-5,0)) +
+          scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.5, 1)) +
           scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
 
+plot
 ```
 
 # Plotting the probability of evolving high transmissibility when $R>1$
@@ -81,8 +82,7 @@ The function we need is also loaded from `code\functions\functions.R`.
 rwt = seq(1.01, 2, by = 0.01)
 pNE = NaN #vector to store nonextinction probs in 
 for(i in 1:length(rwt)){
-  Rwt = rwt[i]
-  pNE[i] = non_extinction(Rwt)
+  pNE[i] = non_extinction(Rwt = rwt[i])
 }
 
 
@@ -133,26 +133,27 @@ probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
 
 probs.emergence.deltaR$delta_R = as.numeric(probs.emergence.deltaR$delta_R)
 
+ggplot() + geom_point(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence)))
+
 ```
 
 ```{r probs-evoltuion}
 # calculate first supercritical R for each starting type 
 supercrit_R = function(Rwt, deltaR){
-  m = ceiling(-log10(Rwt)/deltaR) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+    m = ceiling(abs(log10(Rwt + 10^-12))/log10(1+deltaR)) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
    ### define R0 vector 
-  return(Rwt*(1+deltaR)^(m-1)) # add the changes from wtR0 to give R0 of first supercritical variant
+   super_R = Rwt*(1+deltaR)^(m)
+  return(super_R) # add the changes from wtR0 to give R0 of first supercritical variant
 }
-
 
 # add first supercritical R to DF
 pHigh.Transmission = probs.emergence.deltaR %>%
-  mutate("supercrit.R" = supercrit_R(R0, delta_R))
+  mutate("supercrit.R" = supercrit_R(Rwt=R0, deltaR=delta_R))
 
 # calculate non-extinction probability of BP starting with that R
 pNEs = NaN
 for(i in 1:nrow(pHigh.Transmission)) {
-  Rwt = pHigh.Transmission$supercrit.R[i]
-  pNEs[i] = non_extinction(Rwt)
+  pNEs[i] = non_extinction(Rwt = pHigh.Transmission$supercrit.R[i])
 }
 
 # add to df 
@@ -179,7 +180,7 @@ Finally, we can put together our plot with both subcritical and supercritical Rs
 ### 
 plot = ggplot() +
   geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution))) +
-  scale_y_continuous(limits = c(-6, -.1)) +
+  scale_y_continuous(limits = c(-18, -.1)) +
   scale_x_continuous(limits = c(.7,1.25)) +
   labs(x = "Rwt", y = "Probability of High Transmissibility", title = paste("Mu", mu, "deltaR", delta_Rs[1])) +
   theme_classic()

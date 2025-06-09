@@ -2,7 +2,7 @@
 ######## evenly dispersed distribution described by generating functions for secondary cases
 pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   ### calculate number of variants
-  m = ceiling((((1+10^-12)-R_wt)/delta_R) + 1) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  m = ceiling(abs(log10(R_wt + 10^-10))/log10(1+delta_R)) +1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
   
   ### define R0 vector 
   R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
@@ -61,14 +61,15 @@ pEvolution_singletype = function(Rwt) {
 #fraction to vaccinate to reduce R to some threshold below R=1
 frac_vacc = function(Rt,Reff) {1-(Rt/Reff)}
 
-#single-type BP 
-bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x}
-
 #return non-extinction probability of single-type bp
 non_extinction = function(Rwt) {
+  #single-type BP 
+  bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x}
+  #set start guess
   xstart = 0.5
-  Rwt = Rwt #set Rwt
-  return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
+  #solve for nonextinction prob
+  P = 1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  return(P) #solve for nonextinction probability
 }
 
   
