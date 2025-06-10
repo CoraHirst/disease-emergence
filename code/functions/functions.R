@@ -2,7 +2,7 @@
 ######## evenly dispersed distribution described by generating functions for secondary cases
 pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   ### calculate number of variants
-  m = ceiling(abs(log10(R_wt + 10^-10))/log10(1+delta_R)) +1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  m = ceiling(abs(log10(R_wt + 10^-8))/log10(1+delta_R)) +1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
   
   ### define R0 vector 
   R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant

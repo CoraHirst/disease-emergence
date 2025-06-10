@@ -197,11 +197,13 @@ sim_vacc_frac = sim_vacc_frac %>%
 Finally, we plot the estimated proportion immune given a matrix model simulation from 1980-2023 estimates of birth and death rates in black, and the projected proportion immune given a matrix model simulation from 2023 estimates of birth and death rates in red. 
 
 ```{r plot-predictions}
-ggplot() + 
-  geom_point(data = sim_vacc_frac %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "black") + 
-  geom_point(data = sim_vacc_frac %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = sim_vacc_frac %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
-  labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 and projected to 2080") +
-  theme_bw()  
+plot = ggplot() + 
+            geom_point(data = sim_vacc_frac %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "black") + 
+            geom_point(data = sim_vacc_frac %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = sim_vacc_frac %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme_bw()  
+
+
 
 ```
 

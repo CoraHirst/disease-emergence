@@ -1,0 +1,44 @@
+---
+title: "Poster Figures"
+subtitle: "EEID Notre Dame 2025"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+The goal of this document is to combine work developed in `code/data analysis` and `code/project` to generate a cohesive picture of the probability of virus evolution out of zoonotic reservoirs and into new species populations. In particular, we are interested in the emergence of zoonoses closely related to viruses that have been eradicated from a population and for which population-level immunity is decreasing.
+
+This document will be divided into three sections: 
+
+1) Visualizing the loss of population-level immunity to smallpox over time and consequences for R0
+2) Demonstrating the probability that a virus can evolve high transmissibility when near critical, as the true basic reproductive number of Mpox is unknown but likely close to 1. 
+3) Showing the effect of vaccination on the probability of emergence of highly transmissible disease.
+
+All functions for branching processes and their non-extinction probabilities can be found in the file `code/functions/functions.R` and are loaded below. 
+
+```{r load-analytical-functions}
+source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
+```
+
+# Visualizing the loss of population-level immunity to Smallpox
+
+
+
+
+
+
+

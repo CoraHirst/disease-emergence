@@ -108,7 +108,7 @@ I am working on that function here:
 
 ```{r probs-emergence}
 ## parameters
-R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.02, 1, by = 0.02) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 delta_Rs = c(0.1) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
@@ -159,6 +159,9 @@ for(i in 1:nrow(pHigh.Transmission)) {
 # add to df 
 pHigh.Transmission = pHigh.Transmission %>%
   mutate("pNE" = pNEs)
+
+ggplot() + geom_line(data = pHigh.Transmission, aes(x = R0, y = log10(pNE))) + 
+  geom_line(data = pHigh.Transmission,aes(x = R0, y = log10(P.Emergence)))
 
 ```
 
