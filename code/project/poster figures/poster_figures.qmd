@@ -34,11 +34,182 @@ All functions for branching processes and their non-extinction probabilities can
 source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
 ```
 
-# Visualizing the loss of population-level immunity to Smallpox
+All functions required for data analysis and interpretation can be found in the file `code/functions/analysis_functions.R` and are loaded below. 
 
+```{r load-data-analysis-functions}
+source(here("code", "functions", "analysis_functions.R"))
 
+```
+# Visualizing the loss of population-level immunity to Smallpox and its consequences 
 
+After the eradication of Smallpox and the end of smallpox vaccinations in 1980, the proportion of the population with immunity to smallpox has been slowly decaying. We used a matrix model parameterized by human demographics data reported by the World Health Organization to capture the loss of smallpox immunity at the population level in the Democratic Republic of the Congo from 1980-2023. We then observed how the effective reproductive number of Mpox could be expected to increase as the cross-protection conferred by smallpox immunity is lost. 
 
+## Loss of population level immunity to Smallpox
 
+We observed that the demographics of the Congo have shown little change since 1980, and the country is still undergoing exponential growth. We predicted the continued loss of population level immunity to Smallpox using the matrix model parameterized by the demographics from 2023. 
 
+In the code chunk below, we load the model estimates and projections. These were originally developed in `code/data analysis/congo/matrix_model_projections_2.qmd` and are saved to `results/data analysis/congo/proportion_immune.csv`
 
+```{r load-decaying-immunity}
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+```
+
+Plotted below are the model estimates of the fraction of the population of the DRC with smallpox immunity from 1980-2023 (black) and projected until 2080 (red.)
+
+```{r plot-decaying-immunity}
+plot = ggplot() + 
+            geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = "black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme_bw()  
+# save 
+file = here("results", "poster figs", "fig_decaying_immunity.png")
+ggsave(filename = file, plot = plot)
+```
+
+## The consequences of decaying Smallpox immunity at the population level for the transmissibility of Mpox
+
+One concern that arises from this loss of population immunity is the potential for increased transmission in closely related zoonoses that have spilled into the human population. One such related zoonotic virus is Mpox. While the basic reproductive number of Mpox is unknown (difficulty in estimating it arises from obstacles such as heterogeneity in transmission between subpopulations or between outbreaks, remaining population immunity from Smallpox history, and unknown cross-protection against transmission conferred by mpox), we can plot the effective reproductive number of mpox over time relative to it's basic reproductive number, that is, $\frac{R_e}{R_0}$. 
+
+The increase in $\frac{R_e}{R_0}$ as the fraction of the population with smallpox immunity $f_i$ decays is given as $\frac{R_e}{R_0} = 1-cf_I$, where $c$ represents the cross-protection against mpox transmission conferred by smallpox immunity. 
+
+Below, calculate $\frac{R_e}{R_0}$ for Mpox considering different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r calculate-relative-Re}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected
+
+#calculate
+##create a matrix with year and predicted Re_r0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+```
+
+Now, we plot $\frac{R_e}{R_0}$ as a function of time for different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r plot-relative-Re}
+plot = ggplot() + 
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  scale_color_manual(values = my.colors) +
+  labs(x = "Year", y = "relative effective R, Re/R0", title = "increase in Mpox reproductive number") +
+  theme_bw()
+
+#save 
+file = here("results", "poster figs", "fig_increase_relative_R.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+# Probability to evolution of high transmissibility
+
+We consider the probability that a highly virulent pathogen ($R_e = 3$ can evolve during tranmission after a spillover Mpox infection with some near critical $R_e$.
+
+We consider 3 probabilities: 
+
+1) The probability that a **highly transmissible** variant emerges from a spillover infection with a **slightly supercritical** infection; 
+2) the probability that a **slightly supercritical** infection emerges from a **slightly subcritical** infection, and;
+3) that a **slightly subcritical** infection gives rise to a slightly supercritical infectiona and subsequently evolves to **high transmissibility**. 
+
+## Highly transmissible evolution from slightly supercritical spillover infection
+
+We ran stochastic simulations of a branching process model of virus evolution from one slighlty supercritical infection stepwise to an infection with a highly transmissible reproductive number (these simulations can be found in `code\project\R greater than 1\python simulations`). 
+
+After analysing this data in `code\project\R greater than 1\EvolutionRGreaterThan1.qmd`, we find that the nonextinction probability of the first infection is a good approximation for the probability of evolution to high transmissibility - except for very small R ($ R_E < 1.05$, where the approximation underestimates emergence probability on account of the fact that ultimate extinction may occur for the first type but not before the second type emerges...could it be the sum of the non-extinction probabilities for each type... or something like this?)
+
+We load the python simulation results below: 
+```{r load-supercritical-evolution}
+results = read.csv(here("code", "project", "R greater than 1", "python simulations", "output3.csv"))
+```
+
+and calculate the approximate solutions: 
+
+```{r calculate-supercritical-evolution}
+# sequnce of simulated Rwt
+Rwt = seq(range(results$Rwt)[1], range(results$Rwt)[2], unique(results$Rwt)[2]-unique(results$Rwt)[1])
+
+# calculate nonextinction probabilities
+pNE = sapply(Rwt, non_extinction)
+```
+
+Below, we plot the non-extinction probabilities for the supercritical wild-type Rs with the probabilities of evolving high transmissibility from each wild-type R observed from the simulated branching processes: 
+
+```{r plot-supercritical-evolution}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_point(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = Rwt, y = pNE)) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save
+file = here("results", "poster figs", "fig_P_evolution_supercritR.png")
+ggsave(filename = file, plot = plot)
+```
+
+## Evolution from slightly subcritical spillover infection to supercritical (emergence of sustained transmission)
+
+Below, we analytically solve for the non-extinction probability of a branching process starting with one infection with an $R_e$ less than 1 and evolving stepwise to an $R_e$ greater than 1, at which point the transmissibility is high enough to consider persistence inevitable. With each mutation, the $R_e$ increases by the percentage indicated by $\DeltaR$. 
+
+This model was developed initially in the archived file `code\project\R less than 1\AdaptiveEvolutionModelDevelopment.qmd`, and further explored in `code\project\R less than 1\ Evolution_near_critical_R.qmd`. 
+
+```{r calcualte-subcritical-emergence}
+## parameters
+R_wts = seq(0.0, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3 #mutation rate
+
+## matrix to store emergence probabilities 
+probs.emergence.deltaR = matrix(nrow = length(R_wts), ncol = length(delta_Rs)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(delta_Rs)){
+  for(i in 1:length(R_wts)){
+    probs.emergence.deltaR[i,j] = pEmergence_deltaR(delta_R = delta_Rs[j], mu = mu, R_wt = R_wts[i], R_adapted = R_adapted) #run simulation for each delta_R,R_wt combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.deltaR) = c("R0", as.character(round(delta_Rs, digits = 2))) #name the columns for easy referencing
+probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "delta_R", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+# plot
+plot = ggplot() + 
+          geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R)) + #plot p emergence as function of R_wt for each m
+          theme_bw() + #white background with grey gridlines
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(Delta*R)) + #axis and title labels
+          scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.5, 1)) +
+          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
+
+# save
+file = here("results", "poster figs", "fig_P_emergence_subcritical.png")
+ggsave(filename = file, plot = plot)
+```
+
+## Evolution from slightly subcritical or supercritical spillover infection to highly transmissible
+
+Now, we plot the probability that a subcritical variant not only becomes supercritical, but subsequently evolves to be highly transmissible. This is plotted with the probability that a spillover variant that is slighlty supercritical evolves to be highly transmissible. 
+
+We do this for multiple $\DeltaRs$, on which the supercritical variants aren't dependent but the subcritical are. 

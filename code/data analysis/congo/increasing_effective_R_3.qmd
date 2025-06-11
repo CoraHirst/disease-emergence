@@ -66,13 +66,14 @@ Because we don't know the effective reproductive number of mpox nor the degree o
 cs = seq(0.5, 1, by = 0.1) #half protected to completely protected. 
 
 #define function for cross immunity
-Re_R0_ratio = function(f) {1-c*f}
+Re_R0_ratio = function(c, f) {1-c*f}
+
 
 ##create a matrix with year and predicted Re_r0 for each c. 
 relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
   sapply(proportion_immune$prop_immune, FUN = function(i) {
-    f = j*i #set cross-reactive fraction immune equal to c*f
-    Re_R0_ratio(f)})}) #applying re_r0_ratio function with each c to proportion immune
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
 
 
 #add year to resulting matrix, format as dataframe, and rename features

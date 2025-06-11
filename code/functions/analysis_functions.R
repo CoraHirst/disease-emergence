@@ -15,3 +15,8 @@ multiplesheets <- function(excel.file) {
   
   return(data_frames)
 } 
+
+# function to calculate the relative effective reproductive number given a portion of population immune and considering some cross-immunity
+#define function for cross immunity
+#define function for cross immunity
+Re_R0_ratio = function(c, f) {1-c*f}
