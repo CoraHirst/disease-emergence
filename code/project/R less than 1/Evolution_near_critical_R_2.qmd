@@ -129,6 +129,9 @@ plot = ggplot() +
 print(plot)
 
 signif(emergence_curves[[1]]$P.Emergence,1) == 10^-5
+
+##save scheme
+
 ```
 
 Below, we can plot how this threshold R changes as a function of the two parameters defining the probability of emergence per R, $\Delta R$ and $\mu$. 

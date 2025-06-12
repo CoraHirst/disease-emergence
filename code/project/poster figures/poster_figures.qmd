@@ -115,6 +115,29 @@ ggsave(filename = file, plot = plot)
 
 ```
 
+Finally, we might be interested in plotting both together: 
+
+```{r plot-Re-f-together}
+plot = ggplot() + 
+  #plotting relative effective R
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  #plotting proportion immune
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "fraction of population immune to Smallpox", sec.axis = sec_axis(~., name = "relative effective R, Re/R0")) +
+  labs(x = "Year", title = "increase in Mpox reproductive number") +
+  theme_bw()
+
+#save
+file = here("results", "poster figs", "fig_increase_R_with_f.png")
+ggsave(filename = file, plot = plot)
+```
+
+
 # Probability to evolution of high transmissibility
 
 We consider the probability that a highly virulent pathogen ($R_e = 3$ can evolve during tranmission after a spillover Mpox infection with some near critical $R_e$.
@@ -169,43 +192,61 @@ Below, we analytically solve for the non-extinction probability of a branching p
 
 This model was developed initially in the archived file `code\project\R less than 1\AdaptiveEvolutionModelDevelopment.qmd`, and further explored in `code\project\R less than 1\ Evolution_near_critical_R.qmd`. 
 
-```{r calcualte-subcritical-emergence}
+
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+
+```{r calculate-subcritical-emergence}
 ## parameters
-R_wts = seq(0.0, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
-delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
-mu = 10^-3 #mutation rate
+delta_Rs = c(1, 0.1, 0.05, 0.02)
+mus = c(10^-3, 10^-4) #mutation rate
 
-## matrix to store emergence probabilities 
-probs.emergence.deltaR = matrix(nrow = length(R_wts), ncol = length(delta_Rs)) # vector to store probabilities of emergence
+#applying the pEmergence_deltaR function loaded from functions.R to each parameter combiantion
+emergence_curves = lapply(mus, function(mu) { #creating a seperate dataframe, probs.emergence, for each mu, and storing in list emergence curves
+  ### simulate 
+  probs.emergence.deltaR = sapply(delta_Rs, function(deltaR) { #delta Rs are columns 
+    sapply(R_wts, function(Rwt) { #R_wts are rows
+      pEmergence_deltaR(delta_R = deltaR, mu = mu, R_wt = Rwt, R_adapted = R_adapted)
+    })
+  })
 
-## simulate
-for(j in 1:length(delta_Rs)){
-  for(i in 1:length(R_wts)){
-    probs.emergence.deltaR[i,j] = pEmergence_deltaR(delta_R = delta_Rs[j], mu = mu, R_wt = R_wts[i], R_adapted = R_adapted) #run simulation for each delta_R,R_wt combination
+  ## format matrix for plotting
+  probs.emergence.deltaR = cbind(rep(mu, nrow(probs.emergence.deltaR)), R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+  colnames(probs.emergence.deltaR) = c("mu", "R0", round(delta_Rs, digits = 2)) #name the columns for easy referencing
+  emergence_curves = probs.emergence.deltaR %>% #pivot to long-form
+    pivot_longer(cols = !c(R0,mu), #keep R_wt column
+                 names_to = "delta_R", #add feature denoting "m" used row-wise
+                 values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
   }
-}
+) # output of nested applies will be length(mus) dataframes, each giving the emergence probabilities of each Rwt and delta R combination for some mu
+```
 
-## format matrix for plotting
-probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
-colnames(probs.emergence.deltaR) = c("R0", as.character(round(delta_Rs, digits = 2))) #name the columns for easy referencing
-probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
-  pivot_longer(cols = !R0, #keep R_wt column
-               names_to = "delta_R", #add feature denoting "m" used row-wise
-               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
 
+```{r plot-subcritical-emergence}
 # plot
 plot = ggplot() + 
-          geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R)) + #plot p emergence as function of R_wt for each m
-          theme_bw() + #white background with grey gridlines
-          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(Delta*R)) + #axis and title labels
-          scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
-          coord_cartesian(ylim = c(-8,0), xlim = c(0.5, 1)) +
-          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
+    geom_line(data = emergence_curves[[1]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) + #plot p emergence as function of R_wt for each delta R
+    theme_bw() + #white background with grey gridlines
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+    coord_cartesian(ylim = c(-8, 0), xlim = c(0.5,1))+
+    #scale_y_continuous(limits = c(-13,0)) + #log10 y scale
+    scale_color_manual(values = my.colors, breaks = as.character(delta_Rs)) + #because pretty +
+    scale_linetype_manual(values = c("solid", "dashed"), labels = format(mus, scientific = T))
+
+for(i in 2:length(emergence_curves)){
+  plot = plot +  geom_line(data = emergence_curves[[i]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[i])), lwd = 1, alpha = 0.75)  #plot p emergence as function of R_wt for each delta r and mu
+}
 
 # save
 file = here("results", "poster figs", "fig_P_emergence_subcritical.png")
 ggsave(filename = file, plot = plot)
+
 ```
 
 ## Evolution from slightly subcritical or supercritical spillover infection to highly transmissible
@@ -214,3 +255,324 @@ Now, we plot the probability that a subcritical spillover infection not only bec
 
 We do this for multiple $\DeltaRs$, on which the supercritical variants aren't dependent but the subcritical are. 
 
+In the code chunk below, we calculate the probability of 
+
+```{r calculate-subcritical-to-transmissible}
+##### calculating subcritical to highly transmissible evolution
+## parameters
+R_wts = seq(0.1, 0.98, by = 0.02) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+delta_Rs = c(0.5, 0.1, 0.05, 0.02)
+mu = 10^-3
+
+#applying the pEmergence_deltaR function loaded from functions.R to each parameter combiantion
+### calculate subcritical to supercritical emergence
+probs.emergence.deltaR = sapply(delta_Rs, function(deltaR) { #delta Rs are columns 
+  sapply(R_wts, function(Rwt) { #R_wts are rows
+    pEmergence_deltaR(delta_R = deltaR, mu = mu, R_wt = Rwt, R_adapted = R_adapted)
+  })
+})
+ 
+
+## format matrix for plotting
+probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.deltaR) = c("R0", round(delta_Rs, digits = 2)) #name the columns for easy referencing
+probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "delta_R", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+#### calculating supercritical to highly transmissible probability
+# add first supercritical R to DF
+probs.emergence.deltaR = probs.emergence.deltaR %>%
+    mutate("supercrit.R" = supercrit_R(Rwt = R0, deltaR = as.numeric(delta_R)))
+
+# calculate non-extinction probability of BP starting with that R
+pNEs = NaN
+for(i in 1:nrow(probs.emergence.deltaR)) {
+  pNEs[i] = non_extinction(Rwt = probs.emergence.deltaR$supercrit.R[i])
+}
+
+# add to df 
+probs.emergence.deltaR = probs.emergence.deltaR %>%
+  mutate("pNE" = pNEs)
+
+#finally, calculate subcritical to highly transmissble emergence probability
+probs.emergence.deltaR = probs.emergence.deltaR %>% 
+  mutate("Psubcritical_evolution" = pNE * P.Emergence)
+# output of nested applies will be length(mus) dataframes, each giving the emergence probabilities of each Rwt and delta R c
+
+######################### add r greater than 1
+# solve to plot
+rwt = seq(1.01, 2, by = 0.01)
+pNE = NaN #vector to store nonextinction probs in 
+for(i in 1:length(rwt)){
+  pNE[i] = non_extinction(Rwt = rwt[i])
+}
+
+#format in long form for plotting
+supercrit = cbind(rep(rwt, length(delta_Rs)), rep(delta_Rs, each = length(rwt)), rep(pNE, length(delta_Rs))) %>% as.data.frame()
+
+#add colnames
+colnames(supercrit) = c("R0", "delta_R", "Psubcritical_evolution")
+
+# add plotting information to new df
+pEvolution = rbind(probs.emergence.deltaR %>% select("R0", "delta_R", "Psubcritical_evolution"), supercrit) %>% as.data.frame()
+
+```
+
+And now we plot the probability of evolving high transmissibility in the two regimes together: 
+
+```{r plot-subcritical-to-transmissible}
+### plot together
+plot = ggplot() + 
+    geom_line(data = pEvolution %>% filter(R0 <= 1.01), aes(x = R0, y = log10(Psubcritical_evolution), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) +  #plot p emergence as function of R_wt for each delta R
+    theme_bw() + #white background with grey gridlines
+  geom_line(data = pEvolution %>% filter(R0 >= 1.01), aes(x = R0, y = log10(Psubcritical_evolution), group = delta_R, linetype = as.character(mus[1])), col = "black") +
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    coord_cartesian(ylim = c(-8, 0), xlim = c(0.5,1.25))+
+    scale_color_manual(values = my.colors, breaks = as.character(delta_Rs)) + #because pretty +
+    scale_linetype_manual(values = c("solid", "dashed"), labels = format(mus, scientific = T))
+
+plot
+
+```
+
+# Revist last section if you can analytically calculate emergence probability for the supercritical regime
+
+# The effect of vaccination on preventing the emergence of highly transmissible disease
+
+The sharp decreases in the probability of evolution to high transmission as more mutations are required for emergence suggests that small amounts of vaccination can significantly reduce the probability of disease emergence. 
+
+If we consider a 1 in 100,000 (10^-5) probability of emergence tolerable, then we can calculate the reproductive number for each parameter regime below which emergence is less than this threshold. We will call this the "threshold R", or $R_T$. 
+
+
+```{r plot-plan}
+# plot
+plot = ggplot() + 
+    geom_line(data = emergence_curves[[1]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) + #plot p emergence as function of R_wt for each delta R
+    geom_segment(aes(y = -5, yend = -9, 
+                 x = emergence_curves[[1]] %>% filter(delta_R == 0.25, signif(P.Emergence,1) == 10^-5) %>% slice(1) 
+                 %>% pull(R0) %>% as.numeric(), 
+                 xend = emergence_curves[[1]] %>% filter(delta_R == 0.25, signif(P.Emergence,1) == 10^-5) %>% slice(1) 
+                 %>% pull(R0) %>% as.numeric()), 
+                 linetype = "dotted")  +
+    geom_segment(aes(y = -5, yend = -5, 
+                 x = 0, 
+                 xend = emergence_curves[[1]] %>% filter(delta_R == 0.25, signif(P.Emergence,1) == 10^-5) %>% slice(1) 
+                 %>% pull(R0) %>% as.numeric()), 
+                 linetype = "dotted")  +
+    theme_bw() + #white background with grey gridlines
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+    coord_cartesian(ylim = c(-8, 0)) +
+    #scale_y_continuous(limits = c(-13,0)) + #log10 y scale
+    scale_color_manual(values = my.colors, breaks = as.character(delta_Rs)) + #because pretty +
+    scale_linetype_manual(values = c("solid", "dashed"), labels = format(mus, scientific = T))
+
+
+#print plot and save to results 
+print(plot)
+
+signif(emergence_curves[[1]]$P.Emergence,1) == 10^-5
+
+##save scheme
+file = here("results", "poster figs", "fig_RT_scheme.png")
+ggsave(filename = file, plot = plot)
+```
+
+Plotted below is a heatmap of $R_T$ as a function of the mutation rate and the increase in $\Delta R$ with each mutation: 
+
+```{r caculate-Rt-heatmap}
+### define parms
+deltaRs = seq(0.05, 0.15, by = 0.01) # define vectors of deltaR 
+mus = 10^seq(-6,-2, by = 0.1) # and mu
+
+Rwts = seq(0, 1, by = 0.01) # define vector of Rwts for candidate RTs
+R_adapted = 1000 # define final R s.t. verry low probability of extinction if virus emerges
+
+threshold = 10^-5 # define threshold prob of emergence that we tolerate
+
+### define empty matrix in which to store solutions
+RTs = matrix(nrow = length(deltaRs), ncol = length(mus))
+
+### solve for approximate RTs
+for(i in 1:length(deltaRs)){ #iterate over deltaRs
+  for(j in 1:length(mus)){ #iterate over mus
+    Pemergence = sapply(Rwts, function(x) pEmergence_deltaR(delta_R = deltaRs[i], mu = mus[j], R_wt = x, R_adapted = R_adapted)) #solve for emergence probabilities for each WT R
+    RT = Rwts[which.min(abs(Pemergence-threshold))] #find R whos Pemergence is closest to threshold
+    RTs[i,j] = RT #store in DF
+  } #might think about splitting this one across cores
+}
+
+## make longform 
+RTs.long = as.data.frame(cbind(deltaRs, RTs)) #bind deltaRs as a column for feature referencing
+colnames(RTs.long) = c("deltaR", mus) #name the columns so referencing is easier
+
+RTs.long = RTs.long %>% #pivot to long form
+  pivot_longer(cols = !deltaR,
+               names_to = "mu", 
+               values_to = "RT")
+#matrix still saved as RTs
+```
+
+```{r plot-Rt-heatmap}
+### plot
+plot = ggplot() + 
+  geom_tile(data = RTs.long, aes(x = log10(as.numeric(mu)), y = deltaR, fill = RT)) +
+  scale_x_continuous(breaks = seq(-6, -2, by = 1)) +
+  labs(x = "log10 mu", y = "delta R", fill = "RT", title = "Threshold R to prevent emergence by evolution") +
+  scale_fill_gradientn(colours = my.colors) +
+  theme_classic()
+
+# save 
+file = here("results", "poster figs", "fig_RT.jpg")
+ggsave(filename = file, plot = plot)
+  
+```
+
+In much the same way as a heuristic can inform the extent of vaccination required to eradicate an endemic disease ($f_{eradicate} = 1-\frac{1}{R_0}$), we can observe that vaccination to prevent the emergence of a zoonotic disease with some $R_0$ in the human population requires an additional portion, to prevent the emergence during stochastic chains with subcritical R. This heuristic is given as: 
+
+$f_{p} = 1 - \frac{R_T}{R_0}$
+
+Below, we plot $f_p$ for each parameter combination and considering whether the $R_0$ of the zoonotic disease is slightly subcritical, slightly supercritical, or has evolved to high transmissibility in the human population: 
+
+The function to calculate the fraction to vaccinate to reduce R to some threshold below 1 is given in `code\functions\functions.R`.
+
+```{r calculate-vacc-frac}
+# define Reffectives
+Reffs = c(0.95,1.05,1.15,3) #if R of mpox was one of these, how much do we need to vaccinate given a range of characteristics of the virus to reduce R below the Rt given by those characteristics?
+
+# return a list of matrices with the fv to reduce wt R in Reffs below threshold RTs given in RTs
+list.fvs = lapply(Reffs, function(x) apply(RTs, MARGIN = c(1,2), FUN = function(i) {frac_vacc(Rt = i, Reff = x)})) ## calls fraction to vaccinate function from "functions"
+
+# lets turn each of these into a long-form data frame and use grid.arrange to plot them
+list.fvs.long = lapply(list.fvs, function(x) {fvs.long = as.data.frame(cbind(deltaRs, x)) #bind deltaRs as a column for feature referencing
+      colnames(fvs.long) = c("deltaR", mus) #name the columns so referencing is easier
+      
+      fvs.long = fvs.long %>% #pivot to long form
+        pivot_longer(cols = !deltaR,
+                     names_to = "mu", 
+                     values_to = "fv")
+      return(fvs.long)
+      }
+      )
+names(list.fvs.long) = as.character(Reffs) #renames the elements of list of plots
+```
+
+```{r plot-vacc-frac}
+# greats a list of grobs for ggplot objects     
+list.fvs.heatmaps = lapply(list.fvs.long, function(df) {
+  plot_title = names(list.fvs.long)[which(lapply(list.fvs.long, function(x) identical(x, df)) == T)] #function after title figures out the index of the df in the list of dfs and sets the title to the title of that df in the list
+  plot = ggplot() + geom_tile(data = df, aes(x = log10(as.numeric(mu)), y = deltaR, fill = fv)) + 
+                labs(x = "mu", y = "deltaR", fill = "fraction", title = plot_title) + 
+                scale_x_continuous(breaks = seq(-6, -2, by = 1)) +
+                scale_fill_gradientn(colours = my.colors, limits = c(0,1), na.value = "cadetblue") +
+                theme_classic()
+  return(plot)
+})
+
+#arrange all plots in grid
+plot = do.call(grid.arrange, c(list.fvs.heatmaps, top = "Fraction to vaccinate to prevent emergence by evolution"))
+
+# save 
+file = here("results", "poster figs", "fig_f_p.jpg")
+ggsave(filename = file, plot = plot)
+  
+
+```
+
+I would like to plot a 4x4 figure with the heatmap for $R_T$ in the upper left, then three $f_p$ figures: one for slightly subcritical, one for slightly supercritical, and one for highly transmissible.
+
+
+
+
+```{r calculate-conclusion-fig}
+##################################### calculate RTs
+### define parms
+deltaRs = seq(0.05, 0.15, by = 0.01) # define vectors of deltaR 
+mus = 10^seq(-6,-2, by = 0.1) # and mu
+
+Rwts = seq(0, 1, by = 0.01) # define vector of Rwts for candidate RTs
+R_adapted = 1000 # define final R s.t. verry low probability of extinction if virus emerges
+
+threshold = 10^-5 # define threshold prob of emergence that we tolerate
+
+### define empty matrix in which to store solutions
+RTs = matrix(nrow = length(deltaRs), ncol = length(mus))
+
+### solve for approximate RTs
+for(i in 1:length(deltaRs)){ #iterate over deltaRs
+  for(j in 1:length(mus)){ #iterate over mus
+    Pemergence = sapply(Rwts, function(x) pEmergence_deltaR(delta_R = deltaRs[i], mu = mus[j], R_wt = x, R_adapted = R_adapted)) #solve for emergence probabilities for each WT R
+    RT = Rwts[which.min(abs(Pemergence-threshold))] #find R whos Pemergence is closest to threshold
+    RTs[i,j] = RT #store in DF
+  } #might think about splitting this one across cores
+}
+
+## make longform 
+RTs.long = as.data.frame(cbind(deltaRs, RTs)) #bind deltaRs as a column for feature referencing
+colnames(RTs.long) = c("deltaR", mus) #name the columns so referencing is easier
+
+RTs.long = RTs.long %>% #pivot to long form
+  pivot_longer(cols = !deltaR,
+               names_to = "mu", 
+               values_to = "RT")
+#matrix still saved as RTs
+
+
+############################# Calculate FVs
+# define Reffectives
+Reffs = c(0.95,1.1,3) #if R of mpox was one of these, how much do we need to vaccinate given a range of characteristics of the virus to reduce R below the Rt given by those characteristics?
+
+# return a list of matrices with the fv to reduce wt R in Reffs below threshold RTs given in RTs
+list.fvs = lapply(Reffs, function(x) apply(RTs, MARGIN = c(1,2), FUN = function(i) {frac_vacc(Rt = i, Reff = x)})) ## calls fraction to vaccinate function from "functions"
+
+# lets turn each of these into a long-form data frame and use grid.arrange to plot them
+list.fvs.long = lapply(list.fvs, function(x) {fvs.long = as.data.frame(cbind(deltaRs, x)) #bind deltaRs as a column for feature referencing
+      colnames(fvs.long) = c("deltaR", mus) #name the columns so referencing is easier
+      
+      fvs.long = fvs.long %>% #pivot to long form
+        pivot_longer(cols = !deltaR,
+                     names_to = "mu", 
+                     values_to = "fv")
+      return(fvs.long)
+      }
+      )
+names(list.fvs.long) = as.character(Reffs) #renames the elements of list of plots
+
+```
+
+```{r plot-conclusion-fig}
+### plot RTs
+plot1 = ggplot() + 
+  geom_tile(data = RTs.long, aes(x = log10(as.numeric(mu)), y = deltaR, fill = RT)) +
+  scale_x_continuous(breaks = seq(-6, -2, by = 1)) +
+  labs(x = "log10 mu", y = "delta R", fill = "RT", title = "Threshold R to prevent emergence by evolution") +
+  scale_fill_gradientn(colours = my.colors) +
+  theme_classic()
+
+### plot FVs
+# greats a list of grobs for ggplot objects     
+list.fvs.heatmaps = lapply(list.fvs.long, function(df) {
+  plot_title = names(list.fvs.long)[which(lapply(list.fvs.long, function(x) identical(x, df)) == T)] #function after title figures out the index of the df in the list of dfs and sets the title to the title of that df in the list
+  plot = ggplot() + geom_tile(data = df, aes(x = log10(as.numeric(mu)), y = deltaR, fill = fv)) + 
+                labs(x = "mu", y = "deltaR", fill = "fraction", title = plot_title) + 
+                scale_x_continuous(breaks = seq(-6, -2, by = 1)) +
+                scale_fill_gradientn(colours = my.colors, limits = c(0,1), na.value = "cadetblue") +
+                theme_classic()
+  return(plot)
+})
+
+#add Rts to list of grobs
+list.fvs.heatmaps = append(list.fvs.heatmaps, list(plot1), after = 0)
+
+#arrange all plots in grid
+plot = do.call(grid.arrange, c(list.fvs.heatmaps, top = "Fraction to vaccinate to prevent emergence by evolution"))
+
+
+## save
+file = here("results", "poster figs", "fig_conclusion.png")
+ggsave(filename = file, plot = plot)
+
+```

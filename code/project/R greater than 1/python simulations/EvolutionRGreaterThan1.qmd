@@ -91,15 +91,37 @@ plot = ggplot() +
 plot
 ```
 
-Let's finally see if solving analytically provides a good approximation:
+Another potential approximation is that we sum the nonextinction probability of each type, conditionalized on the fact that they did not go extinct in the previous type...
 
-```{r solve-BP-analytically}
+```{r}
+#return non-extinction probability of single-type bp
+non_extinction = function(Rwt) {
+  #single-type BP 
+  bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x}
+  #set start guess
+  xstart = 0.5
+  #solve for nonextinction prob
+  P = 1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  return(P) #solve for nonextinction probability
+}
 
-pNE_analytic = sapply(rwt, function(r) {pEmergence_supercrit_deltaR(delta_R = 0.1, mu = 10^-3, R_wt = r, R_adapted = 1000})
+### summed conditional probs
+## determine the Rs starting with each Rwt
+mt_Rs = function(Rwt, deltaR){
+  m = ceiling(((3 + 10^-12) - Rwt)/deltaR)   #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  ### define R0 vector 
+  R_is = Rwt + (deltaR)*(0:m)
+  return(R_is) # add the changes from wtR0 to give R0 of first supercritical variant
+}
 
-  pEmergence_supercrit_deltaR(0.1,10^-3,1.01,1000)
-  
+rwt = seq(1.01, 1.2, by = 0.01)
+
+
+
+
+
 ```
+
 
 
 And lets plot the number of generations at 1) emergence and 2) extinction. 

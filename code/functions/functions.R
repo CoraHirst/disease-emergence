@@ -112,3 +112,12 @@ pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   
   return(prob.emergence) 
 }
+
+#calculates the first supercritical R for a lineage starting with wildtype R_wt and increasing by delta_R percent with each mutation
+
+supercrit_R = function(Rwt, deltaR){
+  m = ceiling(abs(log10(Rwt + 10^-12))/log10(1+deltaR)) #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  ### define R0 vector 
+  super_R = Rwt*(1+deltaR)^(m)
+  return(super_R) # add the changes from wtR0 to give R0 of first supercritical variant
+}
