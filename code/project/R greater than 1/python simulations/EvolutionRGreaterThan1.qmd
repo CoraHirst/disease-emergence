@@ -91,6 +91,16 @@ plot = ggplot() +
 plot
 ```
 
+Let's finally see if solving analytically provides a good approximation:
+
+```{r solve-BP-analytically}
+
+pNE_analytic = sapply(rwt, function(r) {pEmergence_supercrit_deltaR(delta_R = 0.1, mu = 10^-3, R_wt = r, R_adapted = 1000})
+
+  pEmergence_supercrit_deltaR(0.1,10^-3,1.01,1000)
+  
+```
+
 
 And lets plot the number of generations at 1) emergence and 2) extinction. 
 

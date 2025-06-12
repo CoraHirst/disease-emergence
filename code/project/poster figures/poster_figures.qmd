@@ -210,6 +210,7 @@ ggsave(filename = file, plot = plot)
 
 ## Evolution from slightly subcritical or supercritical spillover infection to highly transmissible
 
-Now, we plot the probability that a subcritical variant not only becomes supercritical, but subsequently evolves to be highly transmissible. This is plotted with the probability that a spillover variant that is slighlty supercritical evolves to be highly transmissible. 
+Now, we plot the probability that a subcritical spillover infection not only becomes supercritical, but subsequently evolves to be highly transmissible. Thus, the probability that a subcritical spillover evolves to become highly transmissible during human-human transmission is the product of the probabilities that a supercritical infection arises from the subcritical infection chain and the probablity that this first supercritical variant does not go extinct before evolving high transmissibility. This is plotted with the probability that a spillover variant that is slighlty supercritical evolves to be highly transmissible. 
 
 We do this for multiple $\DeltaRs$, on which the supercritical variants aren't dependent but the subcritical are. 
+
