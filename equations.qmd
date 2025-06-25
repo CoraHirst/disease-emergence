@@ -1,0 +1,9 @@
+---
+title: "for equations"
+format: html
+editor: visual
+---
+
+## Quarto
+
+$$ F_p = 1 - \frac{R_T}{R_0} $$
