@@ -76,6 +76,8 @@ ap = 1-(1/rwt)
 
 ```
 
+I have saved this function as `non_extinction()` in `code\functions\functions.R`. 
+
 Now we can plot our predictions based on the non-extinction probability of a branching process starting with a single case with the spillover Rwt. 
 
 ```{r plot-pHigh-preds}
@@ -90,38 +92,6 @@ plot = ggplot() +
 
 plot
 ```
-
-Another potential approximation is that we sum the nonextinction probability of each type, conditionalized on the fact that they did not go extinct in the previous type...
-
-```{r}
-#return non-extinction probability of single-type bp
-non_extinction = function(Rwt) {
-  #single-type BP 
-  bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x}
-  #set start guess
-  xstart = 0.5
-  #solve for nonextinction prob
-  P = 1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
-  return(P) #solve for nonextinction probability
-}
-
-### summed conditional probs
-## determine the Rs starting with each Rwt
-mt_Rs = function(Rwt, deltaR){
-  m = ceiling(((3 + 10^-12) - Rwt)/deltaR)   #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
-  ### define R0 vector 
-  R_is = Rwt + (deltaR)*(0:m)
-  return(R_is) # add the changes from wtR0 to give R0 of first supercritical variant
-}
-
-rwt = seq(1.01, 1.2, by = 0.01)
-
-
-
-
-
-```
-
 
 
 And lets plot the number of generations at 1) emergence and 2) extinction. 
@@ -191,26 +161,10 @@ plot = ggplot() +
 plot
 ```
 
-and finally see how this compares with the approximation beign the non-extinction probability of the first type: 
+and finally see how this compares with the approximation being the non-extinction probability of the first type: 
 
 ```{r non-extinction-probability-2}
 #nonlinear equation solver to solve for fixed point of the generating function for the branching process
-
-## define branching process generating function for offspring distribution
-bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x} #fixed point solution will be this function set to 0
-
-## define initial conditions 
-init = 1 #start with single spillover infection meep meep
-
-## start fixed point guess
-xstart = 0.5 #50 percent will go extinct so lets see
-
-## solve for non extinction probability (1-Pextinction)
-non_extinction = function(Rwt) {
-  Rwt = Rwt #set Rwt
-  return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
-  }
-
 # solve to plot
 rwt = seq(range(results2$Rwt)[1], range(results2$Rwt)[2], by = diff(range(results2$Rwt))/nrow(results2))
 pNE = NaN
@@ -252,6 +206,105 @@ plot
 
 This one makes sense, because a lot of the sizes get too big and go extinct or don't get big at all, so the "sample size" when taking the mean changes. 
 
-```{r plot-generation-emergence-smallR}
+# Best approximation for the probability of emergence of $R \ge 3$ type
+
+Another potential approximation avenue is that we follow a similar approximation for the branching process extinction probabilities as we followed for the emergence probability ($R < 1$ to $R \ge 1$). 
+
+That is, we can solve for the non-extinction probabilities of a branching process with evolution to a mutant type with some $R \ge 3$, but setting the R of the final type to some very large R such that the probability of extinction of the final type is 0. 
+
+I have written this function in `code\functions\functions.R` and will write it here to observe. 
+
+```{r multitype-bp-supercritical-R}
+######## evenly dispersed distribution described by generating functions for secondary cases
+pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
+  ### calculate number of variants
+  m = ceiling(((3 + 10^-12) - R_wt)/delta_R) + 1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  
+  ### define R0 vector 
+  R0 = R_wt + (delta_R)*(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
+  R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  
+  ### define probability of emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting lineage
+  
+  ### define fixed point equations from PGFs
+  ## system of nl equations to solve
+  multi_mut <- function(x) { # for poisson dist. the mean is R_0 and the generating function is exp(R0(s -1))
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i] # fixed point from probability generating function 
+    }
+    y[m] = exp(-R0[m]*(1-x[m])) - x[m] # can only make type m, regardless of mutation. 
+    y
+  }
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[1] = 1 #except for 1 case of the starting type
+  
+  ### define initial guess for fixed point vector
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[1] = 0 #except for the prob of a linneage started by our 1 starting case type 1
+  
+  ### solve for fixed points
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #solve system of nonlinear equations for fixed point
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init) #solve for 1-sum(q_i^init(i)) - should be q_1^1 for a single starting case of type 1 
+  
+  return(prob.emergence) 
+}
+
 
 ```
+
+Notice the choice of the initial guess is close to 0 - we want the least fixed-point solution to the series of nonlinear equations. 
+
+Below, I compare the two approximations to the simulation results. Note that while the non-extinction of the first type approximation does not depend on the $\Delta R$, the approximate solution to the non-extinction probabilities of a branching process with evolution to an infinite final type does depend on $\Delta R$. I will plot the analytical solutions for this approximation for each delta R simulated. 
+
+```{r multitype-bp-approximations}
+### non-extinction of Rwt approximation 
+rwt = seq(range(results2$Rwt)[1], range(results2$Rwt)[2], by = diff(range(results2$Rwt))/nrow(results2))
+delta_Rs = unique(results2$deltaR)
+
+### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+```
+
+And now we can plot the two approximations together with the simulation results:
+
+```{r plot-comparison-approximations}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_point(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = rwt, y = pNE)) +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = pNE_mtbp, group = delta_R, col = delta_R), linetype = "dotted") +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save
+file = here("results", "analysis", "R greater than 1", "fig_P_evolution_smallR.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+The new approximations are in colored dotted lines. We can see that while the approxiamtion still underestimates the emergence probabilities, it is much better than the nonextinction probability of the first type. 
+
+BIG NOTE: I have changed the function to be proportional increase (exponential increase in R0 of each type) rather than step increase (linear). I need to rerun my simulations to account for this. We can try to do that on this computer but may need to run it at work instead. Womp.  

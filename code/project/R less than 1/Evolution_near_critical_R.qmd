@@ -71,7 +71,7 @@ plot
 
 # Plotting the probability of evolving high transmissibility when $R>1$
 
-The approximation asserts that the non-extinction probability of a single-type BP starting with a wildtype R of the first type will be the probability of emergence of the highly transmissible type (we can talk about the time it would take to reach that transmissibility later).
+The approximation asserts that the non-extinction probability of a multi-type BP starting with a wildtype R and evolving stepwise towards an $ R >= 3 $, where the final type has a negligibly small extinction probability. (we can talk about the time it would take to reach that transmissibility later).
 
 The stochastic models were developed in `code\project\R greater than 1\BP_evolution_greater_than_1.qmd` and again in python in `code\project\R greater than 1\python simulations`. The function defining the approximate analytic solution to the branching process model is first introduced in `code\project\R greater than 1\python simulations\BP_evolution_greater_than_1_2.qmd` and is stored in `code\functions\functions.R`.
  
@@ -79,22 +79,28 @@ The function we need is also loaded from `code\functions\functions.R`.
 
 ```{r supercritical}
 # solve to plot
-rwt = seq(1.01, 2, by = 0.01)
-pNE = NaN #vector to store nonextinction probs in 
-for(i in 1:length(rwt)){
-  pNE[i] = non_extinction(Rwt = rwt[i])
-}
+rwt = seq(1.00, 2, by = 0.01)
+delta_Rs = c(.02,.05,.1,.25, 1) 
 
+### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
 
-#plot
-# plot probability of evolution to high R / nonextinction probability for supercritical R singletype
-plot = ggplot() +
-  geom_line(aes(x = rwt, y = pNE)) +
-  theme_bw() +
-  scale_color_manual(values = my.colors) +
-  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
 
-plot
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "Psubcritical_evolution"
+)
+
+colnames(pNE_multitype)[1] = "R0"
 
 ```
 
@@ -108,9 +114,9 @@ I am working on that function here:
 
 ```{r probs-emergence}
 ## parameters
-R_wts = seq(0.02, 1, by = 0.02) #wt R0s to test
+R_wts = seq(0.75, 1, by = 0.001) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
-delta_Rs = c(0.1) #how many types? m-1 mutations required, meaning m-2 intermediate types
+delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
 
 ## matrix to store emergence probabilities 
@@ -133,6 +139,9 @@ probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
 
 probs.emergence.deltaR$delta_R = as.numeric(probs.emergence.deltaR$delta_R)
 
+
+ggplot() +
+  geom_line(data =probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = factor(delta_R), col = factor(delta_R)))
 ```
 
 The code chunk below uses the `supercrit_R()` function loaded from `functions.R` to calculate the first supercritical R for a lineage starting with some wildtype R and evolving by some $\Delta R$ with each mutation. 
@@ -140,23 +149,12 @@ The code chunk below uses the `supercrit_R()` function loaded from `functions.R`
 The probability of evolution to a highly transmissible R is then calculated for each supercritical R by the `non_extinction()` approximation in `functions.R`. 
 
 ```{r probs-evolution}
-
 # add first supercritical R to DF
 pHigh.Transmission = probs.emergence.deltaR %>%
   mutate("supercrit.R" = supercrit_R(Rwt=R0, deltaR=delta_R))
 
 # calculate non-extinction probability of BP starting with that R
-pNEs = NaN
-for(i in 1:nrow(pHigh.Transmission)) {
-  pNEs[i] = non_extinction(Rwt = pHigh.Transmission$supercrit.R[i])
-}
-
-# add to df 
-pHigh.Transmission = pHigh.Transmission %>%
-  mutate("pNE" = pNEs)
-
-ggplot() + geom_line(data = pHigh.Transmission, aes(x = R0, y = log10(pNE))) + 
-  geom_line(data = pHigh.Transmission,aes(x = R0, y = log10(P.Emergence)))
+pHigh.Transmission$pNE = apply(pHigh.Transmission, MARGIN = 1,FUN = function(x) { pEmergence_supercrit_deltaR(delta_R = x["delta_R"], mu = 10^-3, R_wt = x["supercrit.R"], R_adapted = 10000)})
 
 ```
 
@@ -168,7 +166,7 @@ pHigh.Transmission = pHigh.Transmission %>%
   mutate("Psubcritical_evolution" = pNE * P.Emergence)
 
 ###add r greater than 1
-pEvolution = rbind(pHigh.Transmission %>% select("R0", "Psubcritical_evolution"), data.frame("R0" = rwt, "Psubcritical_evolution" = pNE)) %>% as.data.frame()
+pEvolution = rbind(pHigh.Transmission %>% select("R0", "delta_R", "Psubcritical_evolution"), pNE_multitype) %>% as.data.frame()
 
 ```
 
@@ -177,10 +175,12 @@ Finally, we can put together our plot with both subcritical and supercritical Rs
 ```{r total-probs}
 ### 
 plot = ggplot() +
-  geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution))) +
-  scale_y_continuous(limits = c(-18, -.1)) +
+  geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution), group = factor(delta_R), col = factor(delta_R))) +
+  scale_y_continuous(limits = c(-5, 0)) +
   scale_x_continuous(limits = c(.7,1.25)) +
-  labs(x = "Rwt", y = "Probability of High Transmissibility", title = paste("Mu", mu, "deltaR", delta_Rs[1])) +
+  labs(x = "Rwt", y = "Probability of High Transmissibility", title = paste("Mu", mu)) +
+  scale_color_manual(values = my.colors) +
+  geom_vline(xintercept = 1) +
   theme_classic()
 
 
@@ -190,3 +190,10 @@ plot
 # Single function
 
 Now, we would like to create a single function that would return this figure...
+
+I think (?) I can use the same BP model ... let me try. 
+
+```{r single-function-attempt}
+
+
+```

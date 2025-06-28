@@ -74,13 +74,14 @@ non_extinction = function(Rwt) {
 
 ######## evenly dispersed distribution described by generating functions for secondary cases
 pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
-  ### calculate number of variants
-  m = ceiling(((3 + 10^-12) - R_wt)/delta_R) + 1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  m = ceiling((log10(3) - log10(R_wt))/log10(1+delta_R)) + 1 #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
   
   ### define R0 vector 
-  R0 = R_wt + (delta_R)*(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
+  R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
   R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
   
+  
+
   ### define probability of emergence
   prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting lineage
   
@@ -101,7 +102,7 @@ pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
   
   ### define initial guess for fixed point vector
   xstart = rep(0,m) #easiest to set all probs to 0
-  xstart[1] = 1 #except for the prob of a linneage started by our 1 starting case type 1
+  xstart[1] = 0 #except for the prob of a linneage started by our 1 starting case type 1
   
   ### solve for fixed points
   # newton start
@@ -121,3 +122,4 @@ supercrit_R = function(Rwt, deltaR){
   super_R = Rwt*(1+deltaR)^(m)
   return(super_R) # add the changes from wtR0 to give R0 of first supercritical variant
 }
+
