@@ -144,7 +144,7 @@ plot5
 I reran the simulations but choosing the wildtype R to be closer to 1. I'll load those results here: 
 
 ```{r load-sim-2-results}
-results2 = read.csv(here("code", "project", "R greater than 1", "python simulations", "output3.csv"))
+results5 = read.csv(here("code", "project", "R greater than 1", "python simulations", "output5.csv"))
 
 ```
 
@@ -153,7 +153,7 @@ And plot how the probability of emergence changes as a function of the number of
 ```{r plot-pHigh-2}
 # plot probability of evolution to high R
 plot = ggplot() +
-  geom_line(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results5 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
   theme_bw() +
   scale_color_manual(values = my.colors) +
   labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
@@ -265,8 +265,8 @@ Below, I compare the two approximations to the simulation results. Note that whi
 
 ```{r multitype-bp-approximations}
 ### non-extinction of Rwt approximation 
-rwt = seq(range(results2$Rwt)[1], range(results2$Rwt)[2], by = diff(range(results2$Rwt))/nrow(results2))
-delta_Rs = unique(results2$deltaR)
+rwt = seq(range(results5$Rwt)[1], range(results5$Rwt)[2], by = diff(range(results5$Rwt))/nrow(results5))
+delta_Rs = unique(results5$deltaR)
 
 ### solve for non-extinction probabilities
 pNE_multitype = sapply(delta_Rs, function(y) {
@@ -292,8 +292,8 @@ And now we can plot the two approximations together with the simulation results:
 ```{r plot-comparison-approximations}
 # plot probability of evolution to high R
 plot = ggplot() +
-  geom_point(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
-  geom_line(aes(x = rwt, y = pNE)) +
+  geom_point(data = results5 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+ # geom_line(aes(x = rwt, y = pNE)) +
   geom_line(data = pNE_multitype, aes(x = R_wt, y = pNE_mtbp, group = delta_R, col = delta_R), linetype = "dotted") +
   theme_bw() +
   scale_color_manual(values = my.colors) +

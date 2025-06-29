@@ -24,8 +24,9 @@ def iterable_bp_deltaR(parm_vector): # model goes to evolution of high transmiss
     mu = parm_vector['mu']#mutation rate
     gens = parm_vector['gens']#number of generations
     
-    m = math.ceil((Rfinal - Rwt)/deltaR) + 1 # number of steps is the interval between final and initital divided by delta R. Number of types is number of steps + 1.
-    R0 = Rwt + np.arange(0,m+1)*deltaR #+1 because np.arange is exclusive
+    m = math.ceil((math.log10(Rfinal) - math.log10(Rwt))/math.log10(1+deltaR)) + 1 # number of steps is the interval between final and initital divided by delta R. Number of types is number of steps + 1.
+    
+    R0 = Rwt*(1+deltaR)**np.arange(0,m)
     
     #empty data frame to store numbers of individuals of each type over gens generations
     X = np.full(shape = (m,gens+1), fill_value= 0) #m rows means 0 - (m-1) indexing because, python. #gens+1 columns means 0-(gens) indexing. 
@@ -36,10 +37,10 @@ def iterable_bp_deltaR(parm_vector): # model goes to evolution of high transmiss
     ##### simulation
     ### stochastic simulation 
     for gen in range(1,gens):
-      X[0,gen] = sum(random.poisson(lam = (1-mu)*R0[0], size = X[0,gen-1]))
+      X[0,gen] = random.poisson(lam = X[0,gen-1]*(1-mu)*R0[0], size = 1)
       for i in range(1,m-2):
-        X[i,gen] = sum(random.poisson(lam = (1-mu)*R0[i], size = X[i,gen-1])) + sum(random.poisson(lam = mu*R0[i-1], size = X[i-1,gen-1]))
-      X[m-1,gen] = sum(random.poisson(lam = mu*R0[m-2], size = X[m-2,gen-1])) + sum(random.poisson(lam = R0[m-1], size = X[m-1, gen-1]))
+        X[i,gen] = random.poisson(lam = X[i,gen-1]*(1-mu)*R0[i], size = 1) + random.poisson(lam = X[i-1,gen-1]*mu*R0[i-1], size =  1)
+      X[m-1,gen] = random.poisson(lam = X[m-2,gen-1]*mu*R0[m-2], size = 1) + random.poisson(lam = X[m-1, gen-1]*R0[m-1], size = 1)
      
       if gen == (gens-1): #if we reach the end of sim before extinction or emergence, typ = 1 (we can discuss this later) 
         typ = 1

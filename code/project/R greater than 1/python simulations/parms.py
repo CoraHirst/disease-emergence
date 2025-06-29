@@ -19,8 +19,8 @@ mu = [10**(-3)] #mutation rate
 gens = [100] #number of generations
 
 #only change Rwt and deltaR with each run
-Rwt = (np.linspace(1.0,1.1, num = 20 , endpoint = False)).tolist()
-deltaR = np.linspace(0.1,1,num = 10).tolist()        
+Rwt = (np.linspace(1.0,1.5, num = 20 , endpoint = False)).tolist()
+deltaR = [.02,.05,.1,.25, 1]       
 
 
 
@@ -29,3 +29,11 @@ ind_parms = np.array([(a,b,c,d,e,f) for a in Rwt for b in deltaR for c in Rfinal
 
 #save to txt file 
 np.savetxt("parms.txt", ind_parms, delimiter = ' ', fmt = '%f')
+
+
+
+
+
+
+
+
