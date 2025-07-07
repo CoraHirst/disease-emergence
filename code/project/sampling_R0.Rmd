@@ -1,0 +1,97 @@
+---
+title: "PEmergence_sampleR0"
+output: html_document
+date: "2025-06-26"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2) 
+library(here) 
+library(tidyverse) 
+library(nleqslv) 
+library(gridExtra) 
+source(here("code", "functions", "functions.R")) 
+```
+
+
+
+```{r delta-r-model, results = "hide"}
+# parameters
+R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+delta_R = c(seq(0.01, 0.1, by=0.01), c(0.15, 0.2, 0.25)) # % increase in dR
+mus = 10^seq(-4,-2, by = 0.1) #mutation rate
+
+n_sample = 100 #number of random samples
+sd = 0.01 #standard deviation to sample R0
+
+#set up data frame to save results
+probs.emergence = data.frame(matrix(nrow = 0, ncol = 5))
+colnames(probs.emergence) = c("i", "mu", "R0", "dR", "pE")
+
+
+set.seed(45)
+for (i in 1:length(delta_R)){
+  print("---------------------------------")
+  print(paste0("i: ", i, "/", length(delta_R)))
+  for (j in 1:length(R_wts)){
+    print("   -----")
+    print(paste0("   j: ", j, "/", length(R_wts)))
+    for (k in 1:length(mus)){
+      print(paste0("      k: ", k, "/", length(mus)))
+
+      # sample starting R from normal distribution around R_wts
+      R_rd = rnorm(n_sample, mean = R_wts[j], sd = sd)
+      R_rd[R_rd<0] = 0
+      R_rd[R_rd>1] = 1 + 1e-12
+
+      # empty data frame to store pE for sampled R0s
+      tmp <- data.frame(i=1:n_sample,
+                        mu=mus[k],
+                        R0=R_wts[j],
+                        dR=delta_R[i],
+                        pE=NA)
+
+      # determine probability of emergence
+      for (l in 1:n_sample) {
+        tmp$pE[l] = pEmergence_deltaR(delta_R = delta_R[i],
+                                      mu = mus[k],
+                                      R_wt = R_rd[l],
+                                      R_adapted = R_adapted)
+      }
+
+      # append results
+      probs.emergence <- rbind(probs.emergence, tmp)
+
+    }
+  }
+}
+
+
+# save
+saveRDS(probs.emergence, "results/pEmergence-ftol.RDs")
+```
+```{r}
+probs.emergence <- readRDS("results_Julia/pEmergence-ftol.RDs")
+```
+
+```{r delta-r-figure}
+pE <- probs.emergence %>%
+  group_by(mu, R0, dR) %>%
+  summarize(pE=mean(pE))
+
+
+## plot heatmaps
+p <- ggplot() + 
+  geom_tile(data = pE, aes(x = R0, y = mu, fill = log10(pE))) + 
+  labs(x = "spillover R0", y = "mutation rate", fill = "log10 PE") +
+  scale_y_continuous(breaks = 10^seq(-1, -5, -1), trans = "log10") +
+  scale_fill_gradient(low = "white", high = "blue", limits = c(-15, 0)) +    # c(-15, 0)
+  facet_wrap(~dR)
+p
+
+```
+
