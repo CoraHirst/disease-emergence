@@ -75,7 +75,7 @@ for (i in 1:length(delta_R)){
 saveRDS(probs.emergence, "results/pEmergence-ftol.RDs")
 ```
 ```{r}
-probs.emergence <- readRDS("results_Julia/pEmergence-ftol.RDs")
+probs.emergence <- readRDS("results/pEmergence-ftol.RDs")
 ```
 
 ```{r delta-r-figure}
