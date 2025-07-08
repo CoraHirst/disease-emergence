@@ -13,13 +13,13 @@ import numpy as np
 #arguments 
 
 # define matrix of arguments 
-spills = [1000] #number of spillovers 
+spills = [10**3] #number of spillovers 
 Rfinal = [3] #r of final type 
 mu = [10**(-3)] #mutation rate
 gens = [100] #number of generations
 
 #only change Rwt and deltaR with each run
-Rwt = (np.linspace(1.0,1.5, num = 20 , endpoint = False)).tolist()
+Rwt = (np.linspace(1,1.5, num = 20 , endpoint = False)).tolist()
 deltaR = [.02,.05,.1,.25, 1]       
 
 

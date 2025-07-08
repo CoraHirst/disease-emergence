@@ -34,7 +34,7 @@ Here, I am plotting for a range of $\Delta R$ jump sizes in transmissibility wit
 
 ```{r subcritical}
 ## parameters
-R_wts = seq(0.0, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
 mu = 10^-3 #mutation rate
@@ -71,7 +71,7 @@ plot
 
 # Plotting the probability of evolving high transmissibility when $R>1$
 
-The approximation asserts that the non-extinction probability of a multi-type BP starting with a wildtype R and evolving stepwise towards an $ R >= 3 $, where the final type has a negligibly small extinction probability. (we can talk about the time it would take to reach that transmissibility later).
+The approximation asserts that the non-extinction probability of a multi-type BP starting with a wildtype R and evolving towards an $ R >= 3 $, where each intermediate increases in transmissibility by some factor $\Delta R$ and where the final type has a negligibly small extinction probability. (we can talk about the time it would take to reach that transmissibility later).
 
 The stochastic models were developed in `code\project\R greater than 1\BP_evolution_greater_than_1.qmd` and again in python in `code\project\R greater than 1\python simulations`. The function defining the approximate analytic solution to the branching process model is first introduced in `code\project\R greater than 1\python simulations\BP_evolution_greater_than_1_2.qmd` and is stored in `code\functions\functions.R`.
  
@@ -194,6 +194,39 @@ Now, we would like to create a single function that would return this figure...
 I think (?) I can use the same BP model ... let me try. 
 
 ```{r single-function-attempt}
+rwt = seq(0.5, 1.5, by = 0.05)
+delta_Rs = c(0.02, 0.05, 0.1, 0.25, 1)
+  
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
 
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
 
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+
+```
+
+and we can plot these curves below: 
+
+```{r plot-prob-evolve-high-transmission}
+plot = ggplot() +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R)) +
+  geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution), group = factor(delta_R), col = factor(delta_R)), linetype = "dotted") +
+  theme_bw() +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
 ```
