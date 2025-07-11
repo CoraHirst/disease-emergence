@@ -180,7 +180,7 @@ plot = ggplot() +
   scale_x_continuous(limits = c(.7,1.25)) +
   labs(x = "Rwt", y = "Probability of High Transmissibility", title = paste("Mu", mu)) +
   scale_color_manual(values = my.colors) +
-  geom_vline(xintercept = 1) +
+  #geom_vline(xintercept = 1) +
   theme_classic()
 
 
@@ -221,8 +221,8 @@ and we can plot these curves below:
 
 ```{r plot-prob-evolve-high-transmission}
 plot = ggplot() +
-  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R)) +
-  geom_line(data = pEvolution, aes(x = R0, y = log10(Psubcritical_evolution), group = factor(delta_R), col = factor(delta_R)), linetype = "dotted") +
+  geom_line(data = pNE_multitype %>% filter(R_wt >= 1), aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R)) +
+  geom_line(data = pEvolution %>% filter(R0 <= 1), aes(x = R0, y = log10(Psubcritical_evolution), group = factor(delta_R), col = factor(delta_R)), linetype = "dotted") +
   theme_bw() +
   coord_cartesian(ylim = c(-6, 0)) +
   scale_color_manual(values = my.colors) +
