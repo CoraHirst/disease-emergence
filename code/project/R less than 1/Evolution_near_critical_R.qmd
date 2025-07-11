@@ -217,11 +217,11 @@ pNE_multitype = pNE_multitype %>% pivot_longer(
 
 ```
 
-and we can plot these curves below: 
+and we can plot these curves below. The solid lines are the branching process solutions, and the dotted lines are the probability (R < 1 evolves to be R > 1) x probability (R > 1 evolves to be R > 3). Note the slight discrepancy.
 
 ```{r plot-prob-evolve-high-transmission}
-plot = ggplot() +
-  geom_line(data = pNE_multitype %>% filter(R_wt >= 1), aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R)) +
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R)) +
   geom_line(data = pEvolution %>% filter(R0 <= 1), aes(x = R0, y = log10(Psubcritical_evolution), group = factor(delta_R), col = factor(delta_R)), linetype = "dotted") +
   theme_bw() +
   coord_cartesian(ylim = c(-6, 0)) +

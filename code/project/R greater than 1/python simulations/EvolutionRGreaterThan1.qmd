@@ -401,10 +401,15 @@ plot = ggplot() +
   geom_line(data = pNE_multitype, aes(x = R_wt, y = (pNE_mtbp), group = delta_R, col = delta_R), linetype = "dotted") +
   theme_bw() +
   scale_color_manual(values = my.colors) +
-  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+  labs(x = "initial R", y = "Probability of evolving R > 3", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
 
+#save
+file = here("results", "analysis", "R greater than 1", "fig_P_evolution_smallR_proportional.png")
+ggsave(filename = file, plot = plot)
 
 ```
 
 Of course if we'd like to capture probabilities lower than $10^{-3}$ via stochastic simulation I would need to run greater than 1000 simulations for each parameter regime. 
+
+
 
