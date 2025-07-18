@@ -1,0 +1,130 @@
+---
+title: "Poster Figures"
+subtitle: "Summer 2025"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+The goal of this document is to combine work developed in `code/data analysis` and `code/project` to generate a cohesive understanding of the factors that most greatly contribute to the probability of virus evolution out of zoonotic reservoirs and into new species populations. In particular, we are interested in the emergence of zoonoses closely related to viruses that have been eradicated from a population and for which population-level immunity is decreasing.
+
+This document will be divided into three sections: 
+
+1) Visualizing the loss of population-level immunity to smallpox over time and consequences for R
+2) Demonstrating and contextualizing how viruses with low transmissibility can evolve high transmissibility, and will given a significant rate of spillover into the new population. 
+3) Showing the sensitivity of the probability of emergence of highly transmissible disease to reductions in the transmissibility of spillover infections, particularly due to vaccination
+
+All functions for branching processes and their non-extinction probabilities can be found in the file `code/functions/functions.R` and are loaded below. 
+
+```{r load-analytical-functions}
+source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
+```
+
+All functions required for data analysis and interpretation can be found in the file `code/functions/analysis_functions.R` and are loaded below. 
+
+```{r load-data-analysis-functions}
+source(here("code", "functions", "analysis_functions.R"))
+```
+
+# Visualizing the loss of population-level immunity to Smallpox and its consequences 
+
+After the eradication of Smallpox and the end of smallpox vaccinations in 1980, the proportion of the population with immunity to smallpox has been slowly decaying. We used a matrix model parameterized by human demographics data reported by the World Health Organization to capture the loss of smallpox immunity at the population level in the Democratic Republic of the Congo from 1980-2023. We then observed how the effective reproductive number of Mpox could be expected to increase as the cross-protection conferred by smallpox immunity is lost. 
+
+## Loss of population level immunity to Smallpox
+
+We observed that the demographics of the Congo have shown little change since 1980, and the country is still undergoing exponential growth. We predicted the continued loss of population level immunity to Smallpox using the matrix model parameterized by the demographics from 2023. 
+
+In the code chunk below, we load the model estimates and projections. These were originally developed in `code/data analysis/congo/matrix_model_projections_2.qmd` and are saved to `results/data analysis/congo/proportion_immune.csv`
+
+```{r load-decaying-immunity}
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+```
+
+Plotted below are the model estimates of the fraction of the population of the DRC with smallpox immunity from 1980-2023 (black) and projected until 2080 (red.)
+
+```{r plot-decaying-immunity}
+plot = ggplot() + 
+            geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = "black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme_bw()  
+```
+
+One concern that arises from this loss of population immunity is the potential for increased transmission in closely related zoonoses that have spilled into the human population. One such related zoonotic virus is Mpox. While the basic reproductive number of Mpox is unknown (difficulty in estimating it arises from obstacles such as heterogeneity in transmission between subpopulations or between outbreaks, remaining population immunity from Smallpox history, and unknown cross-protection against transmission conferred by mpox), we can plot the effective reproductive number of mpox over time relative to it's basic reproductive number, that is, $\frac{R_e}{R_0}$. 
+
+The increase in $\frac{R_e}{R_0}$ as the fraction of the population with smallpox immunity $F_i$ decays is given as $\frac{R_e}{R_0} = 1-cF_I$, where $c$ represents the cross-protection against mpox transmission conferred by smallpox immunity. 
+
+Below, we calculate $\frac{R_e}{R_0}$ for Mpox considering different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r calculate-relative-Re}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected
+
+#calculate
+##create a matrix with year and predicted Re_r0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+```
+
+Now, we plot $\frac{R_e}{R_0}$ as a function of time for different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r plot-relative-Re}
+plot = ggplot() + 
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  scale_color_manual(values = my.colors) +
+  labs(x = "Year", y = "relative effective R, Re/R0", title = "increase in Mpox reproductive number") +
+  theme_bw()
+
+```
+
+We plot the loss of smallpox immunity on the left axis and related increase in reproductive number on the right axis:
+
+```{r plot-Re-f-together}
+plot = ggplot() + 
+  #plotting relative effective R
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  #plotting proportion immune
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Fraction of population immune to Smallpox, FI", sec.axis = sec_axis(~., name = "relative effective R, Re/R0")) +
+  labs(x = "Year", title = "increase in Mpox reproductive number", color = "Cross immunity, c") +
+  theme_bw()
+
+#save
+file = here("results", "paper figs", "fig_increase_R_with_f.png")
+ggsave(filename = file, plot = plot)
+```
+
