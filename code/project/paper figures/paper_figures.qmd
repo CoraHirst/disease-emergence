@@ -123,8 +123,31 @@ plot = ggplot() +
   labs(x = "Year", title = "increase in Mpox reproductive number", color = "Cross immunity, c") +
   theme_bw()
 
+```
+
+As immunity wanes at the population level, the number of spillovers also increases proportional to the density of susceptible individuals (as the number of susceptible human-animal interactions will decrease.) The proportion of successful of spillovers in the presence of population immunity compared to a population with no immunity would follow the same pattern as the reproductive number, that is, the rate at which the number of successful spillovers approaches the number that would occur in a completely naive popualtion would follow the relative reproductive number in the population: 
+
+$spill \ rate = spill \ rate_0 (1-cf_v)$
+
+I make a simple adjustment to the previous figure to acknowledge this. 
+
+```{r plot-Re-f-together}
+plot = ggplot() + 
+  #plotting relative effective R
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  #plotting proportion immune
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Fraction of population immune to Smallpox, FI", sec.axis = sec_axis(~., name = "relative effective R, R/R0 \n and relative spillover rate")) +
+  labs(x = "Year", title = "increase in Mpox reproductive number and spillover rate", color = "Cross immunity, c") +
+  theme_bw()
+
 #save
 file = here("results", "paper figs", "fig_increase_R_with_f.png")
 ggsave(filename = file, plot = plot)
-```
 
+```
