@@ -1,0 +1,46 @@
+---
+title: "comparison"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+Both the rate at which zoonoses spill into human populations and the probability that zoonoses evolve high transmissibility after spillover are reduced when immunity is introduced into a population. The goal of this document is to compare how changes to these two different parameters - spillover rate, $\rho$ and initial basic reproductive number of spillover infections, $R_o$ - effect the overall probability of disease emergence. 
+
+Both $\rho$ and $\R_o$ will change linearly with the fraction of the population immune to infection. However, as we've observed in `code/project/R less than 1/AdaptiveEvolutionModelDevelopment.qmd`, the probability that a disease evolves high transmissibility increases nonlinearly and sharply with $R_o$. Thus, while the overall probability of disease emergence will change proportional to the number of spillover events over a given period of time, the same change in $R_o$ is likely to lead to a dramatically changed probability of emergence. 
+
+In the following document, we observe the contributions of changing $\rho$ and $R_o$ to the overall change in the probability of disease emergence as vaccination changes the fraction of a population immune to infection.
+
+
+# Total probability of disease emergence
+
+The overall probability that an infectious disease emerges over a given period of time depends both on the number of spillover infections that over that period of time ($N$) and the probability that each spillover event evolves into a highly infectious disease ($p_E$.) 
+
+Given a rate of $\rho$ spillover infections per year, the probability that the infectious disease emergese over the course of a year is given as: 
+
+$$
+P_E = 1- (1-p_E)^\rho
+$$
+
+In other words, the probability that the infectious disease emerges is the probability that at least one of the $\rho$ spillover infections successfully evolves to high transmissibility. 
+
+# The effect of population immunity on $\rho$ and $R_O$
+
+As members of a population become immune to infection, the frequency of interactions between infected individuals and susceptible individuals decreases proportionally. This means that both $R_o$, the number of individuals an infected person infects on average, and $\rho$, the number of infections caused by host jumps from the animal reservoir to humans, change linearly with the fraction of immunity the population. 
+
+We can illustrate how $R$ and $\rho$ would approach their innate values (what their infectivity would be in a completely unvaccinated population) as immunity is lost in a rapidly growing country like the Congo after the end of smallpox ciruclation and vaccination. The proportion of the population born before 1980 is calculated in the file `code/data analysis/congo/matrix_model_projections.qmd` and is saved in `results/congo/proportion_immune.csv`
+
