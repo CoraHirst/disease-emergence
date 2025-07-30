@@ -17,6 +17,16 @@ num_cols = 20
 my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
 ```
 
+Loading functions for evolution calculations, waning immunity calculations, etc.
+
+```{r load-analytical-functions}
+source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
+```
+
+```{r load-data-analysis-functions}
+source(here("code", "functions", "analysis_functions.R"))
+```
+
 # Objective
 
 Both the rate at which zoonoses spill into human populations and the probability that zoonoses evolve high transmissibility after spillover are reduced when immunity is introduced into a population. The goal of this document is to compare how changes to these two different parameters - spillover rate, $\rho$ and initial basic reproductive number of spillover infections, $R_o$ - effect the overall probability of disease emergence. 
@@ -42,5 +52,98 @@ In other words, the probability that the infectious disease emerges is the proba
 
 As members of a population become immune to infection, the frequency of interactions between infected individuals and susceptible individuals decreases proportionally. This means that both $R_o$, the number of individuals an infected person infects on average, and $\rho$, the number of infections caused by host jumps from the animal reservoir to humans, change linearly with the fraction of immunity the population. 
 
-We can illustrate how $R$ and $\rho$ would approach their innate values (what their infectivity would be in a completely unvaccinated population) as immunity is lost in a rapidly growing country like the Congo after the end of smallpox ciruclation and vaccination. The proportion of the population born before 1980 is calculated in the file `code/data analysis/congo/matrix_model_projections.qmd` and is saved in `results/congo/proportion_immune.csv`
+We can illustrate how $R$ and $\rho$ would approach their innate values (what the cross-species or human-human infectivity would be in a completely unvaccinated population) as immunity is lost in a rapidly growing country like the Congo after the end of smallpox ciruclation and vaccination. The proportion of the population born before 1980 is calculated in the file `code/data analysis/congo/matrix_model_projections.qmd` and is saved in `results/congo/proportion_immune.csv`.
 
+In the code chunk below, we load the calculated proportion of the population immune from 1980-2023 and projected from 2023 to 2080 as a data frame: 
+
+```{r load-congo-data}
+#read in csv file as data frame
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+
+#inspect
+head(proportion_immune)
+
+```
+
+We can plot the changes in the proporiton of the population immune over time: 
+
+```{r plot-immunity-over-time}
+#plot fraction of the population immune over time from Congo matrix model calculations
+plot = ggplot() + 
+            geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = "black") + #from reported demographics
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + #projections from most recent demographics in red
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme_bw()  
+
+print(plot) #print to screen
+
+```
+
+As the density of immune individuals in the population decays, the frequency of interactions between infected individuals (either animal or human) and susceptible individuals that successfully lead to new infection increases.
+
+Both $\rho$ and $R$ will change as $\rho = \rho_o(1-cf_v)$ and $R = R_o(1-cf_v)$, where $\rho_o$ and $\R_o$ are the values of these parameters in a completely vaccinated population. A slight adjustment to this can be made to accound for the fact that immunity to smallpox might not be entirely protective against mpox, such that a portion of protection ($c$) conferred against smallpox is conferred against mpox, yielding $\rho = \rho_o(1-cf_v)$ and $R = R_o(1-cf_v)$
+
+Below, we calculate how $R$ and $\rho$ of mpox will approach their maximum in an unvaccinated population without mutation as immunity wanes, that is, $\frac{R}{R_o}$ and $\frac{\rho}{\rho_o}$, for various levels of cross protection conferred by smallpox vaccination. Note that the aforementioned functions are loaded from `functions.r` and `analysis_functions.r` at the start of this document.
+
+
+```{r changing-R-and-rho-calculation}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected
+
+#calculate
+##create a matrix with year and predicted Re_r0  and rho/rho0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+
+
+```
+
+and we visualize this in the plot below: 
+
+```{r changing-R-and-rho-plot}
+#plot from previous calculations
+plot = ggplot() + 
+  #plotting relative effective R and rho
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  #plotting proportion immune
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "fraction of population immune to Smallpox, fv", sec.axis = sec_axis(~., name = "relative effective R and Rho")) +
+  labs(x = "Year", title = "increase in Mpox reproductive number", color = "cross immunity, c") +
+  theme_bw()
+
+print(plot) # print to screen
+```
+
+# How do changes in $\rho$ due to population immunity change $P_E$? 
+
+The frequency of spillover infections will decrease proportional to the density of immune individuals in the population. The following plot shows the extent to which changes in spillover rate due to population immunity changes the probability that a virus evolves high transmissibility. 
+
+The probability of emergence per spillover infection ($p_E$) depends on the rate (per infection) at which infections are initiated by a variant with a beneficial mutation (which we term $\mu$) and the increase in transmissibility conferred by a beneficial mutation (which we assume is proportional to the transmissibility of the previous variant by a factor of $/delta R$). We illustrate the change in $P_E$ due to changes in $\rho$ by population immunity for a virus with a $\mu = 10^-3$ and $\delta R = 0.02$. 
+
+Finally, we must first observe the behavior of $P_E$ as a function of $N$ for a given 
+
+
+Problems:
+
+1) how do we pick which R for $R_0$? in some ranges changes are much steeper than others
+
+2) how do we pick which $N_0$? Should I plot $P_E$ against N first to see the sensitivity? 
+
+3) Most likely solution - we pick a few $N_0$ and $R_0$ to look at changes due to $F_v$ over.... as in , maybe 3 different figures for both R and N... although how do we pick which ones to plot together? or do we keep them seperate maube? it would be nice to plot together... maybe we don't care which is greater, just the rate at which the difference changes with different levels of population immunity. That seems like the way to go...
