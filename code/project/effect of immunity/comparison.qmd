@@ -137,7 +137,154 @@ The frequency of spillover infections will decrease proportional to the density 
 
 The probability of emergence per spillover infection ($p_E$) depends on the rate (per infection) at which infections are initiated by a variant with a beneficial mutation (which we term $\mu$) and the increase in transmissibility conferred by a beneficial mutation (which we assume is proportional to the transmissibility of the previous variant by a factor of $/delta R$). We illustrate the change in $P_E$ due to changes in $\rho$ by population immunity for a virus with a $\mu = 10^-3$ and $\delta R = 0.02$. 
 
-Finally, we must first observe the behavior of $P_E$ as a function of $N$ for a given 
+## $P_E$ as a function of $N$
+
+We must first observe the behavior of $P_E$ as a function of $N$. In the code chunk below, we define the function of $P_E = 1-(1-p_e)^N$.
+
+```{r define-PE-N}
+# define total probability of emergence as f(n,p_e)
+P_E = function(N, p_e) {1-(1-p_e)^N} #probability that not all 
+
+```
+
+and calculate $P_E$ as a function of $N$, given a few different values of $p_E$. These values are chosen after visual inspection of the range of $p_E$ given a range of $\mu$ and $\Delta R$ visualized in `code/project/R less than 1/AdaptiveEvolutionModelDevelopment.qmd`
+
+```{r calculate-PE-N}
+# parameter ranges
+Ns = 10^seq(0,8, by = 0.1)
+p_es = 10^seq(-8, -3, by = 1)  #define p_es 
+
+# calculate P_E
+P_Es = sapply(p_es, function(p) {sapply(Ns, function(n) {P_E(N = n, p_e = p)})}) %>% 
+  cbind(Ns, .) %>% #add column for Ns, independent variable
+  as.data.frame() #as data frame for dplyr to pivot to long form
+
+# format data frame for easier referencing
+colnames(P_Es) = c("N", as.character(p_es))
+
+# pivot to long form
+P_Es = P_Es %>% 
+  pivot_longer(cols = !N, 
+               names_to = "p_e",
+               values_to = "P_E")
+```
+
+finally, we plot the dependence of $P_E$ on $N$ and $p_e$ below: 
+
+```{r plot-PE-N}
+# total probability of emergence
+plot1 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(N), y = P_E, group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  geom_line(data = P_Es, aes(x = log10(N), y = P_E, group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Total probability of emergence, PE, per unit time") +
+  labs(x = "Log10 number of spillovers per unit time, log10(N)", title = "Probability of emergence by log10 N", color = "probability per spillover, pe") +
+  theme_bw()
+
+#log10 total probability of emergence
+plot2 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(N), y = log10(P_E), group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  geom_line(data = P_Es, aes(x = log10(N), y = log10(P_E), group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Log10 Total probability of emergence, log10(PE), per unit time") +
+  labs(x = "Log10 number of spillovers per unit time, log10(N)", title = "Log10 Probability of emergence by log10 N", color = "probability per spillover, pe") +
+  theme_bw()
+
+#plot together
+grid.arrange(plot1, plot2, nrow = 2)
+```
+
+The log probability of emergence increases nearly linearly with the log number of spillovers, but saturates near 1 at high N. The value at which emergence saturates depends on the the $p_e$, with the probability of emergence nearing one at around the same order of magnitude of spillovers (not the right phrase, but 10^-5 saturates at 10^5, and so on)
+
+## $P_E$ as a function of $p_e$
+
+We can also observe the effect of $p_e$ on $P_E$, given no change in $N$, for multiple different values of $N$. 
+
+We will refer to the previously defined function of $P_E = 1-(1-p_e)^N$ and calculate $P_E$ as a function of $p_E$, given a few different values of $N$. These values are chosen on account of what may be a reasonable rate of spillover on a per-year basis, and spans logs to account for uncertaintly in the rate of successful infection from zoonotic reservoir into people.
+
+```{r calculate-PE-pe}
+# parameter ranges
+Ns = 10^seq(2,6, by = 1) #define spillover number per year
+p_es = 10^seq(-8, 0, by = 0.1)  #define p_es 
+
+# calculate P_E
+P_Es = sapply(Ns, function(n) {sapply(p_es, function(p) {P_E(N = n, p_e = p)})}) %>% #calculate P_E for each combination of pe and N
+  cbind(p_es, .) %>% #add column for Ns, independent variable
+  as.data.frame() #as data frame for dplyr to pivot to long form
+
+# format data frame for easier referencing
+colnames(P_Es) = c("p_e", as.character(Ns)) 
+
+# pivot to long form
+P_Es = P_Es %>% 
+  pivot_longer(cols = !p_e, 
+               names_to = "N",
+               values_to = "P_E")
+```
+
+We can plot the results below: 
+
+```{r plot-PE-pe}
+# total probability of emergence
+plot1 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(p_e), y = P_E, group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  geom_line(data = P_Es, aes(x = log10(p_e), y = P_E, group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Total probability of emergence, PE, per unit time") +
+  labs(x = "Log10 probability of emergence after spillover", title = "Probability of emergence by log10 p_e", color = "number of spillover events per year, N") +
+  theme_bw()
+
+#log 10 total probability of emergence
+plot2 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(p_e), y = log10(P_E), group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  geom_line(data = P_Es, aes(x = log10(p_e), y = log10(P_E), group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Log10 total probability of emergence, PE, per unit time") +
+  labs(x = "Log10 probability of emergence after spillover", title = "Probability of emergence by log10 p_e", color = "number of spillover events per year, N") +
+  theme_bw()
+
+#plot together
+grid.arrange(plot1, plot2)
+
+```
+The dependence of $P_E$ on $p_e$ is similar in character to the dependence of $P_E$ on $N$, saturating in magnitude at some $p_e$ inversely equivalent to the number of spillovers per year. 
+
+
+## How do changes small changes in $N$ and $R_0$ due to population immunity $f_v$ effect the overall probability of emergence?
+
+Because $N$ and $p_e$ may have confounding effects, to determine the change in $P_E$ conferred by a change in one and not the other requires udnerstanding what that change would look like given a few different values of the other. As such, we will make a grid of different combinations of the $p_e$ used to observe the effect of changing $N$ and $N$ used to observe the effect of chaning $p_e$. 
+
+We define that grid of combinations in the code chunk below: 
+
+```{r define-pe-n-combos}
+# range of p_es to test
+ps = 10^seq(-6,-3, by = 1)
+
+#ranges of ns to test
+ns = 10^seq(3, 6, by = 1)
+
+# matrix of combinations
+ps_by_ns = expand.grid(ps,ns) 
+
+# name columns for referencing
+colnames(ps_by_ns) = c("pe", "n") #column 1 is pe, column 2 is n
+```
+
+In the following section, we calculate the effect of changing $R_0$ or $N$, either independently or together, on the probability of emergence. 
+
+```{r plot-algorithm}
+#define fvs 
+fvs = seq(0.01, 1, by = 0.01)
+
+# for a given pe and N
+
+#caclulating changes in PE due to changing n: 
+pe = p
+
+
+
+
+```
 
 
 Problems:

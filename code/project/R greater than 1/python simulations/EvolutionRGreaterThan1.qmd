@@ -28,7 +28,6 @@ The output of the python simulation is stored in `python simulations/output2.csv
 
 ```{r load-sim-results}
 results = read.csv(here("code", "project", "R greater than 1", "python simulations", "output2.csv"))
-
 ```
 
 Now lets go ahead and plot the probability of evolution to high transmissibility.
