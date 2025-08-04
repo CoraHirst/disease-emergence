@@ -252,9 +252,33 @@ The dependence of $P_E$ on $p_e$ is similar in character to the dependence of $P
 
 ## How do changes small changes in $N$ and $R_0$ due to population immunity $f_v$ effect the overall probability of emergence?
 
-Because $N$ and $p_e$ may have confounding effects, to determine the change in $P_E$ conferred by a change in one and not the other requires udnerstanding what that change would look like given a few different values of the other. As such, we will make a grid of different combinations of the $p_e$ used to observe the effect of changing $N$ and $N$ used to observe the effect of chaning $p_e$. 
+Because $N$ and $R$ have confounding effects, to determine the change in $P_E$ conferred by a change in one and not the other requires understanding what that change would look like given a few different values of the other. As such, we will make a grid of different combinations of the $R$ used to observe the effect of changing $N$ and $N$ used to observe the effect of chaning $R$. 
 
-We define that grid of combinations in the code chunk below: 
+First, we define a vecotr of $p_e$ spanning multiple logs, and calculate the $R$ that confers these $p_e$ given a $\mu = 10^{-3}$ and $\Delta R = 0.02$.
+
+```{r calculate-Rs}
+# range of p_es for which we'd like Rs
+ps = 10^seq(-6,-3, by = 1)
+
+# defining mutation parameters
+mu = 10^-3 # 1 in 1000 infections gives rise to a new better transmitting variant
+delta_r = 0.02 # 2% increase in transmissibility with mutation
+
+# defining candidate Rs
+rs = seq(0.5,1.5, by = 0.01) 
+
+# algorithm for finding the R that confers ps per spillover
+df = sapply(rs, function(r) {pEmergence_supercrit_deltaR(delta_R = delta_r, mu = mu, R_wt = r, R_adapted = 10^3)}) %>%
+  cbind(rs, .) %>%
+  as.data.frame()
+
+# 
+
+
+
+```
+
+We define that grid of combinations in the code chunk below.
 
 ```{r define-pe-n-combos}
 # range of p_es to test
@@ -277,10 +301,11 @@ In the following section, we calculate the effect of changing $R_0$ or $N$, eith
 fvs = seq(0.01, 1, by = 0.01)
 
 # for a given pe and N
-
 #caclulating changes in PE due to changing n: 
-pe = p
+p = p
+n = n
 
+sapply(fvs, function(fv) {})
 
 
 
