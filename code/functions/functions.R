@@ -123,3 +123,5 @@ supercrit_R = function(Rwt, deltaR){
   return(super_R) # add the changes from wtR0 to give R0 of first supercritical variant
 }
 
+########################## total emergencce probability ########################## 
+total_P = function(p, S, years) { 1 - (1-p)^(S*years)}

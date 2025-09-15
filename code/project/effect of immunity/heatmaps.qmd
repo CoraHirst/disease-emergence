@@ -1,0 +1,105 @@
+---
+title: "heatmaps"
+format: html
+editor: visual
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv) #for solving nonlinear equations
+
+# colors for plotting
+num_cols = 30
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+## plotting the total probability of emergence
+
+The total probability of emergence (of a highly transmissible disease, $R \approx 3$) in a given year is a function of the probability of emergence per spillover ($p$) and the rate of spillovers per year ($S$). The number of spillovers per year is the rate of spillovers multiplied by the unit time, 1 year, such that $n = S(1) = S$. Treating disease emergence as a bernoullie process, the total probability of emergence in a year can be calculated as:
+
+$$ 
+P = 1 - (1-p)^{n}
+$$
+
+$p$ is a function of the initial reproductive number after spillover, $R_{spill}$; the mate at which adaptive mutations are aquired per-infection, $\mu$; and, importantly, the proportional increase in fitness conferred by a beneficial mutation, $\sigma$. We note that changes in the reproductive number of a variant due to non-pharameutical interventions that change contact rates (such as social distancing) can affect both $S$ and $\sigma$. We thus plot a series of heatmaps showing the total probability of emergence over the course of a year given a range of mutation rates and spillover R for various combinations of $S$ and $\sigma$.
+
+## load functions 
+
+We will need two functions: a function to calculate the probability of emergence per spillover ($p$) and a function that calculates the total probability of emergence in a given interval of time, $P$. 
+
+We load these two functions from the file `\code\functions\functions.R`.
+
+```{r load-functions}
+source(here("code", "functions", "functions.R"))
+
+```
+
+# setting our range of parameters
+
+```{r params}
+## probability per spillover parameters
+R_wts = seq(0.5, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+sigmas = c(0.02, 0.05, 0.1)
+mus = 10^seq(-6,-2, by = 0.1) # and mu
+
+## total emergence parameters
+Ss = c(100, 1000) #spillovers/year
+years = 1 #time interval in which to calculate probability
+
+```
+
+In the code chunk below, we generate `r length(Ss)*length(sigmas)` different heatmaps that plot the total probability of emergence over the course of `r years` years given a range of $R_{spill}$ and $\mu$. Each of the 6 plots corresponds with one combination of $\sigma$ and $S$.
+
+
+```{r generate-plots}
+plots = lapply(sigmas, function(sigma){
+         lapply(Ss, function(S){
+          # set parms for total p
+            S = S #spillover rate
+          
+            ## matrix of ps
+            ps = sapply(mus, function(mu){ #iterates over all spillover R and mu combinations - outermost sapply is columns
+                    sapply(R_wts, function(R_spill){
+                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) # generates a matrix containing probabilities of emergence per spillover
+                  })
+                })
+          # solve for total emergence probability 
+            P = apply(ps, c(1,2), function(p) {total_P(p = p, S = S, years = years)}) %>% as.data.frame() # generates a matrix containing Total emergence probabilities from total_P calculation, converts to data frame
+            colnames(P) = mus # columns are mus
+            
+          # create a plot
+            ## transforms data frame to long form
+            P_long = P %>% pivot_longer(cols = colnames(P),
+                                        names_to = "mu",
+                                        values_to = "P") %>%
+              cbind("Rspill" = R_wts, .) %>%
+              as.data.frame()
+            
+            ## plots long form df
+            plot = ggplot() + geom_tile(data = P_long, aes(x = Rspill, y = log10(as.numeric(mu)), fill = log10(P))) +
+                      labs(x = "R spill", y = "mu", fill = "P", title = paste0("sigma is ", sigma, " and S is ", S)) + 
+                      scale_x_continuous(breaks = seq(0.5, 1, by = 1)) +
+                      scale_y_continuous(breaks = seq(-6, -2, by = 1)) +
+                      scale_fill_gradientn(colours = my.colors, na.value = "cadetblue") +
+                      geom_contour(data = P_long, aes(x = Rspill, y = as.numeric(log10(as.numeric(mu))), z = log10(P)), breaks = c(-2,-1), col = 'maroon')
+                      theme_classic()
+            
+            return(plot)
+            
+        })
+  })
+
+#returns a list of length(S) lists containing length(sigmas) elements
+```
+
+```{r plot-plots}
+plots_list = do.call(c, plots) #concatenates list of lists into a single list
+do.call(grid.arrange, plots_list) #plots all lists together 
+```
+
