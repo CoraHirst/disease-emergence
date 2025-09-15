@@ -222,4 +222,52 @@ ggsave(filename = file, plot = plot)
 
 ```
 
-Now, we investigate
+
+# Fraction to vaccinate to prevent disease emergence
+
+Here we calculate the fraction of the population which must be vaccinated to prevent infectious disease emergence given a spillover $R_{spill}$ and some $R_{eff}$ below which the pathogen is unlikely to evolve sustained transmission after spillover. 
+
+Parallel to the classic heuristic giving the fraction of the population that must be vaccinated to eradicate an endemic disease, $F_{eradication} = 1 - \frac{1}{R_0}$, the fraction of the population that must be vaccinated to prevent the evolutionary emergence of a disease can be given by:
+
+$$
+F_{prevention} = 1 - \frac{R_{prevent}}{R_{spill}}
+$$
+```{r calculate-f-prevention}
+Rps = seq(0.8, 0.9, by = 0.01) # define R preventions
+Rwts = c(seq(0.91, 1.2, by = 0.01))  # define R0s note the last is smallpox R
+
+f_vaccinate = function(Rp, Rwt) { 1- Rp/Rwt} #define fraction to vaccinate function
+
+# calculate f_vaccinate
+F_prevent = sapply(Rps, function(Rp){
+              sapply(Rwts, function(Rwt){
+                f_vaccinate(Rp, Rwt)
+              })
+            })
+
+# format for heatmap
+F_prevent = cbind(Rwts, F_prevent) %>% as.data.frame() # add column to indicate Rwt for each row
+colnames(F_prevent) = c("Rspill", Rps) #rename columns with Rp for referencing
+
+# pivot to long form 
+F_prevent_long = pivot_longer(F_prevent, 
+                              cols = !Rspill,
+                              names_to = "Rp",
+                              values_to = "Fp")
+
+
+
+```
+
+plot:
+
+```{r plot-f-prevention}
+# heatmap
+plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill = Fp)) +
+   labs(x = "R spill", y = "R prevention", fill = "Fraction to vaccinate", title = "Fraction to vaccinate to prevent evolutionary emergence") + 
+   scale_x_continuous(breaks = c(seq(0.9, 1.2, by = 0.1))) +
+   scale_fill_gradientn(colours = my.colors, na.value = "cadetblue") +
+  theme_classic()
+
+print(plot)
+```
