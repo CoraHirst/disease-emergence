@@ -43,7 +43,7 @@ source(here("code", "functions", "functions.R"))
 
 ```{r params}
 ## probability per spillover parameters
-R_wts = seq(0.5, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 sigmas = c(0.02, 0.05, 0.1)
 mus = 10^seq(-6,-2, by = 0.1) # and mu
@@ -58,52 +58,40 @@ In the code chunk below, we generate `r length(Ss)*length(sigmas)` different hea
 
 
 ```{r generate-plots}
-plots = lapply(sigmas, function(sigma){
-         lapply(Ss, function(S){
+# calculating probability of emergence during a year
+plots = lapply(Ss, function(S){
+           lapply(sigmas, function(sigma){
           # set parms for total p
             S = S #spillover rate
           
             ## matrix of ps
             ps = sapply(mus, function(mu){ #iterates over all spillover R and mu combinations - outermost sapply is columns
                     sapply(R_wts, function(R_spill){
-                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) # generates a matrix containing probabilities of emergence per spillover
+                    p = pEmergence_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) # generates a matrix containing probabilities of emergence per spillover
                   })
                 }) %>% as.data.frame() 
-            colnames(ps) = mus
+           
           # solve for total emergence probability 
-            #P = apply(ps, c(1,2), function(p) {total_P(p = p, S = S, years = years)}) %>% as.data.frame() # generates a matrix containing Total emergence probabilities from total_P calculation, converts to data frame
-            #colnames(P) = mus # columns are mus
+            P = apply(ps, c(1,2), function(p) {total_P(p = p, S = S, years = years)}) %>% as.data.frame() # generates a matrix containing Total emergence probabilities from total_P calculation, converts to data frame
+            P = cbind(R_wts, P) %>% as.data.frame()
+            colnames(P) = c("Rspill", mus) # columns are mus
+            
             
           # create a plot
             ## transforms data frame to long form
-            #P_long = P %>% pivot_longer(cols = colnames(P),
-                                       # names_to = "mu",
-                                       # values_to = "P") %>%
-              #cbind("Rspill" = R_wts, .) %>%
-              #as.data.frame()
-            
-            ## plots long form df
-           # plot = ggplot() + geom_tile(data = P_long, aes(x = Rspill, y = log10(as.numeric(mu)), fill = log10(P))) +
-                    #  labs(x = "R spill", y = "mu", fill = "P", title = paste0("sigma is ", sigma, " and S is ", S)) + 
-                    #  scale_x_continuous(breaks = seq(0.5, 1, by = 1)) +
-                    #  scale_y_continuous(breaks = seq(-6, -2, by = 1)) +
-                    #  scale_fill_gradientn(colours = my.colors, na.value = "cadetblue") +
-                     # geom_contour(data = P_long, aes(x = Rspill, y = as.numeric(log10(as.numeric(mu))), z = log10(P)), breaks = c(-2,-1), col = 'maroon')
-                      #theme_classic()
-            ps_long = ps %>%
-              pivot_longer(cols = colnames(ps),
-                           names_to = "mu",
-                           values_to = "p") %>%
-              cbind("Rspill" = R_wts, .) %>%
+            P_long = P %>% pivot_longer(cols = !Rspill,
+                                        names_to = "mu",
+                                        values_to = "P") %>%
               as.data.frame()
             
-            plot = ggplot() + geom_tile(data = ps_long, aes(x = Rspill, y = log10(as.numeric(mu)), fill = log10(p))) +
+            ## plots long form df
+            plot = ggplot() + geom_tile(data = P_long, aes(x = Rspill, y = log10(as.numeric(mu)), fill = log10(P))) +
                       labs(x = "R spill", y = "mu", fill = "P", title = paste0("sigma is ", sigma, " and S is ", S)) + 
-                      scale_x_continuous(breaks = seq(0.5, 1, by = 1)) +
                       scale_y_continuous(breaks = seq(-6, -2, by = 1)) +
                       scale_fill_gradientn(colours = my.colors, na.value = "cadetblue") +
-                      
+                      geom_contour(data = P_long, aes(x = Rspill, y = as.numeric(log10(as.numeric(mu))), z = log10(P)), breaks = c(-3,-1), col = 'maroon') +
                       theme_classic()
+            
             
             return(plot)
             
@@ -114,7 +102,14 @@ plots = lapply(sigmas, function(sigma){
 ```
 
 ```{r plot-plots}
+# plot list of plots with grid.arrange
 plots_list = do.call(c, plots) #concatenates list of lists into a single list
-do.call(grid.arrange, plots_list) #plots all lists together 
+do.call(grid.arrange, c(plots_list, ncol = 3)) #plots all lists together 
 ```
+
+
+# Takeaways
+
+It's clear that changes to the benefit in transmission gained by a mutation ($\sigma$) affects the emergence probability to a much greater extent than changes in the number of spillovers.
+
 
