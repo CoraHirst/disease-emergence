@@ -61,7 +61,7 @@ probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
 plot = ggplot() + 
           geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R)) + #plot p emergence as function of R_wt for each m
           theme_bw() + #white background with grey gridlines
-          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(Delta*R)) + #axis and title labels
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(sigma)) + #axis and title labels
           scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
           coord_cartesian(ylim = c(-8,0), xlim = c(0.5, 1)) +
           scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
@@ -226,7 +226,7 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
   theme_bw() +
   coord_cartesian(ylim = c(-6, 0)) +
   scale_color_manual(values = my.colors) +
-  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")+
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = expression(sigma), title = "Probability of evolving high transmissibility, spillover R > 1")+
   theme(axis.text=element_text(size=12),
         axis.title=element_text(size=16),
         legend.title = element_text(size = 16), # Legend title font size
@@ -236,3 +236,4 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
 file = here("results", "analysis", "fig_p_evolution_Rs.jpg")
 ggsave(filename = file, plot = plot)
 ```
+

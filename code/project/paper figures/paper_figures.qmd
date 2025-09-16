@@ -201,7 +201,7 @@ for(k in 1:length(mus)){ #creating a seperate dataframe, probs.emergence, for ea
 plot = ggplot() + 
     geom_line(data = emergence_curves[[1]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) + #plot p emergence as function of R_wt for each delta R
     theme_bw() + #white background with grey gridlines
-    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(sigma), linetype = expression(mu)) + #axis and title labels
     scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
     coord_cartesian(ylim = c(-8, 0), xlim = c(0.2,1))+
     #scale_y_continuous(limits = c(-13,0)) + #log10 y scale
@@ -218,10 +218,10 @@ print(plot)
 # save 
 file = here("results", "paper figs", "fig_subcritical_to_critical.jpg")
 ggsave(filename = file, plot = plot)
-  
 
 ```
 
+<<<<<<< Updated upstream
 
 # Fraction to vaccinate to prevent disease emergence
 
@@ -271,3 +271,15 @@ plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill 
 
 print(plot)
 ```
+=======
+Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
+
+```{r plot-subcritical-to-highly-infectious}
+
+
+
+
+
+````
+
+>>>>>>> Stashed changes
