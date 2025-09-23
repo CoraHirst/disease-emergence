@@ -221,7 +221,18 @@ ggsave(filename = file, plot = plot)
 
 ```
 
-<<<<<<< Updated upstream
+# Emergence probability per spillover
+
+Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
+
+```{r plot-subcritical-to-highly-infectious}
+
+
+
+
+
+```
+
 
 # Fraction to vaccinate to prevent disease emergence
 
@@ -232,9 +243,10 @@ Parallel to the classic heuristic giving the fraction of the population that mus
 $$
 F_{prevention} = 1 - \frac{R_{prevent}}{R_{spill}}
 $$
+
 ```{r calculate-f-prevention}
 Rps = seq(0.8, 0.9, by = 0.01) # define R preventions
-Rwts = c(seq(0.91, 1.2, by = 0.01))  # define R0s note the last is smallpox R
+Rwts = c(seq(0.91, 1.2, by = 0.01),3)  # define R0s note the last is smallpox R
 
 f_vaccinate = function(Rp, Rwt) { 1- Rp/Rwt} #define fraction to vaccinate function
 
@@ -250,7 +262,7 @@ F_prevent = cbind(Rwts, F_prevent) %>% as.data.frame() # add column to indicate 
 colnames(F_prevent) = c("Rspill", Rps) #rename columns with Rp for referencing
 
 # pivot to long form 
-F_prevent_long = pivot_longer(F_prevent, 
+F_prevent_long = pivot_longer(F_prevent, #long form input for geom_tile
                               cols = !Rspill,
                               names_to = "Rp",
                               values_to = "Fp")
@@ -271,15 +283,6 @@ plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill 
 
 print(plot)
 ```
-=======
-Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
-
-```{r plot-subcritical-to-highly-infectious}
 
 
 
-
-
-````
-
->>>>>>> Stashed changes
