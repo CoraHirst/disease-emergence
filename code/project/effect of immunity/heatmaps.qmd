@@ -1,7 +1,6 @@
 ---
 title: "heatmaps"
 format: html
-editor: visual
 ---
 
 ```{r setup}
@@ -28,9 +27,9 @@ $$
 
 $p$ is a function of the initial reproductive number after spillover, $R_{spill}$; the mate at which adaptive mutations are aquired per-infection, $\mu$; and, importantly, the proportional increase in fitness conferred by a beneficial mutation, $\sigma$. We note that changes in the reproductive number of a variant due to non-pharameutical interventions that change contact rates (such as social distancing) can affect both $S$ and $\sigma$. We thus plot a series of heatmaps showing the total probability of emergence over the course of a year given a range of mutation rates and spillover R for various combinations of $S$ and $\sigma$.
 
-## load functions 
+## load functions
 
-We will need two functions: a function to calculate the probability of emergence per spillover ($p$) and a function that calculates the total probability of emergence in a given interval of time, $P$. 
+We will need two functions: a function to calculate the probability of emergence per spillover ($p$) and a function that calculates the total probability of emergence in a given interval of time, $P$.
 
 We load these two functions from the file `\code\functions\functions.R`.
 
@@ -55,7 +54,6 @@ years = 1 #time interval in which to calculate probability
 ```
 
 In the code chunk below, we generate `r length(Ss)*length(sigmas)` different heatmaps that plot the total probability of emergence over the course of `r years` years given a range of $R_{spill}$ and $\mu$. Each of the 6 plots corresponds with one combination of $\sigma$ and $S$.
-
 
 ```{r generate-plots}
 # calculating probability of emergence during a year
@@ -107,9 +105,6 @@ plots_list = do.call(c, plots) #concatenates list of lists into a single list
 do.call(grid.arrange, c(plots_list, ncol = 3)) #plots all lists together 
 ```
 
-
 # Takeaways
 
 It's clear that changes to the benefit in transmission gained by a mutation ($\sigma$) affects the emergence probability to a much greater extent than changes in the number of spillovers.
-
-

@@ -204,7 +204,7 @@ relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows 
 R_wts = seq(0, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 delta_Rs = c(1, 0.1, 0.05, 0.02)
-mus = c(10^-3, 10^-4) #mutation rate
+mus = c(10^-3,10^-4) #mutation rate
 
 #applying the pEmergence_deltaR function loaded from functions.R to each parameter combiantion
 emergence_curves = lapply(mus, function(mu) { #creating a seperate dataframe, probs.emergence, for each mu, and storing in list emergence curves
@@ -230,11 +230,11 @@ emergence_curves = lapply(mus, function(mu) { #creating a seperate dataframe, pr
 ```{r plot-subcritical-emergence}
 # plot
 plot = ggplot() + 
-    geom_line(data = emergence_curves[[1]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) + #plot p emergence as function of R_wt for each delta R
+    geom_line(data = emergence_curves[[1]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[1])), linewidth = 2) + #plot p emergence as function of R_wt for each delta R
     theme_bw() + #white background with grey gridlines
-    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(sigma), linetype = expression(mu)) + #axis and title labels
     scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
-    coord_cartesian(ylim = c(-8, 0), xlim = c(0.5,1))+
+    coord_cartesian(ylim = c(-8, 0), xlim = c(0.6,1))+
     #scale_y_continuous(limits = c(-13,0)) + #log10 y scale
     scale_color_manual(values = my.colors, breaks = as.character(delta_Rs)) + #because pretty +
     scale_linetype_manual(values = c("solid", "dashed"), labels = format(mus, scientific = T))
@@ -243,9 +243,10 @@ for(i in 2:length(emergence_curves)){
   plot = plot +  geom_line(data = emergence_curves[[i]], aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R, linetype = as.character(mus[i])), lwd = 1, alpha = 0.75)  #plot p emergence as function of R_wt for each delta r and mu
 }
 
+plot
 # save
-file = here("results", "poster figs", "fig_P_emergence_subcritical.png")
-ggsave(filename = file, plot = plot)
+#file = here("results", "poster figs", "fig_P_emergence_subcritical.png")
+#ggsave(filename = file, plot = plot)
 
 ```
 
@@ -329,7 +330,7 @@ plot = ggplot() +
     geom_line(data = pEvolution %>% filter(R0 <= 1.01), aes(x = R0, y = log10(Psubcritical_evolution), group = delta_R, col = delta_R, linetype = as.character(mus[1]))) +  #plot p emergence as function of R_wt for each delta R
     theme_bw() + #white background with grey gridlines
   geom_line(data = pEvolution %>% filter(R0 >= 1.01), aes(x = R0, y = log10(Psubcritical_evolution), group = delta_R, linetype = as.character(mus[1])), col = "black") +
-    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(Delta*R), linetype = expression(mu)) + #axis and title labels
+    labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", col = expression(sigma), linetype = expression(mu)) + #axis and title labels
     coord_cartesian(ylim = c(-8, 0), xlim = c(0.5,1.25))+
     scale_color_manual(values = my.colors, breaks = as.character(delta_Rs)) + #because pretty +
     scale_linetype_manual(values = c("solid", "dashed"), labels = format(mus, scientific = T))

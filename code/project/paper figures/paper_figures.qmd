@@ -284,5 +284,61 @@ plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill 
 print(plot)
 ```
 
+# How does emergence chang with $S$ and $\sigma$?
 
+Below, we plot how the probability of emergence of highly transmissible disease changes as a function of $R_{spill}$ and $S$ for a range of $\sigma$ and $\mu$.
+
+```{r heatmaps-S-Rspill}
+
+#function pEmergence_supercrit_deltaR calculates the probability of evolution to R = 3 default
+#function total_P calculates the probability of emergence of a length of time years given spillover rate per year and proabability of emergence per spillover. 
+
+### define parm ranges
+R_adapted = 100000
+mus = c(10^-4, 10^-3) #rows of grid
+sigmas = c(0.05, 0.1) #columns of grid
+
+R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+#generate list of plots to format as grid
+plots = lapply(mus, function(mu){ #rows of grid
+          lapply(sigmas, function(sigma){ #columns of grid
+            ## set simulation parms for fig
+            mu = mu # set mu for this plot
+            sigma = sigma # set sigma for this plot
+            
+            ## vector of ps
+            ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
+                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+            ## calculate total P for each ps and S combination
+            Ps = sapply(Ss, function(S){ #outside is columns
+              sapply(ps, function(p){ #inside is rows
+                P = total_P(p, S, years=1) #probability of emergence over a single year
+              })
+            }) %>% cbind(R_wts, .) %>% as.data.frame()
+            
+            # format df for plotting
+            colnames(Ps) = c("Rspill", Ss) #name columns
+            Ps_long = Ps %>% pivot_longer(cols = !Rspill,
+                                     names_to = "S",
+                                     values_to = "P") %>% as.data.frame
+
+            ## Plot
+            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
+              labs(x = "Rspill", y = "Spillover rate per year", title = paste0("mu is ", mu, " sigma is ", sigma), legend = "log10 P") +
+              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0)) +
+              geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black') +
+              theme_classic()
+  
+            return(plot)
+   })
+})
+
+plots
+#plot
+plots = do.call(c, (plots))
+do.call(grid.arrange, c(plots, nrow = 2))
+```
 

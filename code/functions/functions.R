@@ -73,8 +73,8 @@ non_extinction = function(Rwt) {
 }
 
 ######## evenly dispersed distribution described by generating functions for secondary cases
-pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
-  m = ceiling((log10(3) - log10(R_wt))/log10(1+delta_R)) + 1 #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted, supercritical_R = 3) {
+  m = ceiling((log10(supercritical_R) - log10(R_wt))/log10(1+delta_R)) + 1 #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
   
   ### define R0 vector 
   R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
