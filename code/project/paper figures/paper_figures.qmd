@@ -58,9 +58,13 @@ Plotted below are the model estimates of the fraction of the population of the D
 
 ```{r plot-decaying-immunity}
 plot = ggplot() + 
-            geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = "black") + 
-            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+            geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
+            geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
             labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme(axis.text = element_text(size = 20),
+                  axis.title = element_text(size = 20), 
+                  legend.title = element_text(size = 20),
+                  legend.text = element_text(size = 20)) +
             theme_bw()  
 ```
 
@@ -106,22 +110,35 @@ plot = ggplot() +
 
 ```
 
-We plot the loss of smallpox immunity on the left axis and related increase in reproductive number on the right axis:
+We plot the loss of smallpox immunity on the left axis and related increase in reproductive number on the right axis. This figure will be saved in `/results/paper figs`.
 
 ```{r plot-Re-f-together}
 plot = ggplot() + 
   #plotting relative effective R
-  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
-  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
-  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
-  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  geom_line(data = relative.effective.R %>% filter(Year <= 2024), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2, alpha = 0.5) +
   #plotting proportion immune
-  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
-            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
-  scale_color_manual(values = my.colors) +
-  scale_y_continuous(name = "Fraction of population immune to Smallpox, FI", sec.axis = sec_axis(~., name = "relative effective R, Re/R0")) +
-  labs(x = "Year", title = "increase in Mpox reproductive number", color = "Cross immunity, c") +
-  theme_bw()
+  geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
+  geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
+  #adding labels
+  scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative reproductive number ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
+  scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)) +
+  labs(x = "Year", color = "Cross immunity") +
+  # plot aesthetics
+  theme_bw() + 
+  theme(axis.text = element_text(size = 20),
+        axis.text.y.right = element_text(size = 20, color = "royalblue4"),
+        axis.title = element_text(size = 20),
+        axis.title.y.right = element_text(size = 20, color = "royalblue4"),
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 20)) +
+  scale_color_manual(values = brewer.pal(n = length(cs), name = "Blues")) 
+
+
+print(plot)
+#save
+file = here("results", "paper figs", "fig_increase_R_with_f.png")
+ggsave(filename = file, plot = plot)
 
 ```
 
@@ -132,7 +149,7 @@ As immunity wanes at the population level, the number of spillovers also increas
 
 $spill \ rate = spill \ rate_0 (1-cf_v)$
 
-I make a simple adjustment to the previous figure to acknowledge this. 
+I make a simple adjustment to the previous figure to acknowledge this in case we want it later.
 
 ```{r plot-Re-f-together}
 plot = ggplot() + 
@@ -148,10 +165,6 @@ plot = ggplot() +
   scale_y_continuous(name = "Fraction of population immune to Smallpox, FI", sec.axis = sec_axis(~., name = "relative effective R, R/R0 \n and relative spillover rate")) +
   labs(x = "Year", title = "increase in Mpox reproductive number and spillover rate", color = "Cross immunity, c") +
   theme_bw()
-
-#save
-file = here("results", "paper figs", "fig_increase_R_with_f.png")
-ggsave(filename = file, plot = plot)
 
 ```
 
@@ -226,7 +239,38 @@ ggsave(filename = file, plot = plot)
 Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
 
 ```{r plot-subcritical-to-highly-infectious}
+## parameters
+R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3 #mutation rate
 
+## matrix to store emergence probabilities 
+probs.emergence.deltaR = matrix(nrow = length(R_wts), ncol = length(delta_Rs)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(delta_Rs)){
+  for(i in 1:length(R_wts)){
+    probs.emergence.deltaR[i,j] = pEmergence_deltaR(delta_R = delta_Rs[j], mu = mu, R_wt = R_wts[i], R_adapted = R_adapted) #run simulation for each delta_R,R_wt combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.deltaR) = c("R0", as.character(round(delta_Rs, digits = 2))) #name the columns for easy referencing
+probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "delta_R", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+# plot
+plot = ggplot() + 
+          geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R), linewidth = 2) + #plot p emergence as function of R_wt for each m
+          theme_bw() + #white background with grey gridlines
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(sigma)) + #axis and title labels
+          scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.6, 1)) +
+          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
 
 
 
