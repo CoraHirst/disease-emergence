@@ -15,7 +15,8 @@ library(nleqslv)
 
 # colors for plotting
 num_cols = 20
-my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+my.colors = brewer.pal(n = 8, name = "Set1")
+my.colors.many = colorRampPalette(my.colors)(num_cols)
 ```
 
 # Objective
@@ -121,17 +122,17 @@ plot = ggplot() +
   geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
   geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
   #adding labels
-  scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative reproductive number ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
+  scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative effective R ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
   scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)) +
   labs(x = "Year", color = "Cross immunity") +
   # plot aesthetics
   theme_bw() + 
-  theme(axis.text = element_text(size = 20),
-        axis.text.y.right = element_text(size = 20, color = "royalblue4"),
-        axis.title = element_text(size = 20),
-        axis.title.y.right = element_text(size = 20, color = "royalblue4"),
-        legend.title = element_text(size = 20),
-        legend.text = element_text(size = 20)) +
+  theme(axis.text = element_text(size = 25),
+        axis.text.y.right = element_text(size = 25, color = "royalblue4"),
+        axis.title = element_text(size = 25),
+        axis.title.y.right = element_text(size = 25, color = "royalblue4"),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 25)) +
   scale_color_manual(values = brewer.pal(n = length(cs), name = "Blues")) 
 
 
@@ -176,9 +177,9 @@ Canonically, an infection with a small reproductive number after spilling over i
 
 We use branching process theory to explore this process of mutation during transmission chains. In this section, we plot the probabilities that the pathogen emerges in the population with an $R > 1$ and subsequently evolves an $R /geq 3$, the estimated reproductive number of smallpox. 
 
-Below, we plot the probability that the pathogen evolves an $R > 1$ after spillover: 
+Below, we plot the probability that the pathogen evolves an $R > 1$ after spilloverfor different mus: 
 
-```{r plot-subcritical-to-critical}
+```{r plot-subcritical-to-supercritical-mus}
 ## parameters
 R_wts = seq(0, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
@@ -229,16 +230,14 @@ for(i in 2:length(emergence_curves)){
 print(plot)
 
 # save 
-file = here("results", "paper figs", "fig_subcritical_to_critical.jpg")
+file = here("results", "paper figs", "fig_subcritical_to_critical_mus.jpg")
 ggsave(filename = file, plot = plot)
 
 ```
 
-# Emergence probability per spillover
+and below we plot the curves for a single mu: 
 
-Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
-
-```{r plot-subcritical-to-highly-infectious}
+```{r plot-subcritical-to-supercritical}
 ## parameters
 R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
@@ -270,11 +269,199 @@ plot = ggplot() +
           labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(sigma)) + #axis and title labels
           scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
           coord_cartesian(ylim = c(-8,0), xlim = c(0.6, 1)) +
-          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) #because pretty
+          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) + #because pretty
+  # aesthetics
+          theme_bw() + 
+          theme(axis.text = element_text(size = 25),
+                axis.title = element_text(size = 25),
+                legend.title = element_text(size = 25),
+                legend.text = element_text(size = 25))
+
+# save 
+file = here("results", "paper figs", "fig_subcritical_to_critical.jpg")
+ggsave(filename = file, plot = plot)
+
+
+```
+
+# Emergence probability per spillover
+
+Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
+
+
+below we plot the probability that a pathogen with a subcritical reproductive number evolves a hihgly infectious (R = 3) reproductive number after spillover: 
+
+```{r subcritical-to-highly-infectious}
+rwt = seq(0.5, 1.5, by = 0.05)
+delta_Rs = c(0.02, 0.05, 0.1, 0.25, 1)
+  
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R), linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_color_manual(values = my.colors) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", col = expression(sigma)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=24),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )    
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R.png")
+ggsave(filename = file, plot = plot)
+
+
+
+```
+
+And now we show how this probability changes with mu: 
+
+```{r subcrictical-to-highly-infections-mus}
+rwt = seq(0.5, 1.5, by = 0.05)
+mus = 10^seq(-5, -1, by = 1)
+sigma = 0.1
+  
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(mus, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = y, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(mus)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "mu",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)), alpha = factor(as.numeric(mu))), color = "#4DAF4AFF", linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_alpha_manual(values = c(0.2, 0.4, 0.6, 0.8, 1 ), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", alpha = expression(mu)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=25),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )    
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R_mus.png")
+ggsave(filename = file, plot = plot)
 
 
 
 
+```
+
+# Pandemic potential 
+
+The total probability of emergence (of a highly transmissible disease, $R \approx 3$) in a given year is a function of the probability of emergence per spillover ($p$) and the rate of spillovers per year ($S$). The number of spillovers per year is the rate of spillovers multiplied by the unit time, 1 year, such that $n = S(1) = S$. Treating disease emergence as a bernoullie process, the total probability of emergence in a year can be calculated as:
+
+$$ 
+P = 1 - (1-p)^{n}
+$$
+
+$p$ is a function of the initial reproductive number after spillover, $R_{spill}$; the mate at which adaptive mutations are aquired per-infection, $\mu$; and, importantly, the proportional increase in fitness conferred by a beneficial mutation, $\sigma$. We note that changes in the reproductive number of a variant due to non-pharameutical interventions that change contact rates (such as social distancing) can affect both $S$ and $R_{spill$. We thus plot a series of heatmaps showing the total probability of emergence over the course of a year given a range of mutation rates and $\sigma$s for various combinations of $S$ and $R_{spill$.
+
+# How does emergence chang with $S$ and $R$?
+
+Below, we plot how the probability of emergence of highly transmissible disease changes as a function of $R_{spill}$ and $S$ for a range of $\sigma$ and $\mu$.
+
+```{r heatmaps-S-Rspill}
+
+#function pEmergence_supercrit_deltaR calculates the probability of evolution to R = 3 default
+#function total_P calculates the probability of emergence of a length of time years given spillover rate per year and proabability of emergence per spillover. 
+
+### define parm ranges
+R_adapted = 100000
+mus = c(10^-4, 10^-3) #rows of grid
+sigmas = c(0.05, 0.1) #columns of grid
+
+R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+Ss = seq(1, 10^5, 1000)
+
+#generate list of plots to format as grid
+plots = lapply(mus, function(mu){ #rows of grid
+          lapply(sigmas, function(sigma){ #columns of grid
+            ## set simulation parms for fig
+            mu = mu # set mu for this plot
+            sigma = sigma # set sigma for this plot
+            
+            ## vector of ps
+            ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
+                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+            ## calculate total P for each ps and S combination
+            Ps = sapply(Ss, function(S){ #outside is columns
+              sapply(ps, function(p){ #inside is rows
+                P = total_P(p, S, years=1) #probability of emergence over a single year
+              })
+            }) %>% cbind(R_wts, .) %>% as.data.frame()
+            
+            # format df for plotting
+            colnames(Ps) = c("Rspill", Ss) #name columns
+            Ps_long = Ps %>% pivot_longer(cols = !Rspill,
+                                     names_to = "S",
+                                     values_to = "P") %>% as.data.frame()
+
+            ## Plot
+            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = (as.numeric(S)), fill = log10(P))) +
+              labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), title = paste0("mu is ", mu, " sigma is ", sigma), legend = "log P") +
+              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+              geom_contour(data = Ps_long, aes(x = Rspill, y = (as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black',linewidth = 1.5) +
+              #aesthetics
+              theme_classic() +
+              theme(axis.text=element_text(size=24),
+                    axis.title=element_text(size=24),
+                    legend.title = element_text(size = 24), # Legend title font size
+                    legend.text = element_text(size = 16)  # Legend key labels font size
+                    )    
+              
+  
+            return(plot)
+   })
+})
+
+#plot
+plots = do.call(c, (plots))
+do.call(grid.arrange, c(plots, nrow = 2))
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential.jpg")
+ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
 ```
 
 
@@ -326,63 +513,5 @@ plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill 
   theme_classic()
 
 print(plot)
-```
-
-# How does emergence chang with $S$ and $\sigma$?
-
-Below, we plot how the probability of emergence of highly transmissible disease changes as a function of $R_{spill}$ and $S$ for a range of $\sigma$ and $\mu$.
-
-```{r heatmaps-S-Rspill}
-
-#function pEmergence_supercrit_deltaR calculates the probability of evolution to R = 3 default
-#function total_P calculates the probability of emergence of a length of time years given spillover rate per year and proabability of emergence per spillover. 
-
-### define parm ranges
-R_adapted = 100000
-mus = c(10^-4, 10^-3) #rows of grid
-sigmas = c(0.05, 0.1) #columns of grid
-
-R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
-Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
-
-#generate list of plots to format as grid
-plots = lapply(mus, function(mu){ #rows of grid
-          lapply(sigmas, function(sigma){ #columns of grid
-            ## set simulation parms for fig
-            mu = mu # set mu for this plot
-            sigma = sigma # set sigma for this plot
-            
-            ## vector of ps
-            ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
-                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
-          
-            ## calculate total P for each ps and S combination
-            Ps = sapply(Ss, function(S){ #outside is columns
-              sapply(ps, function(p){ #inside is rows
-                P = total_P(p, S, years=1) #probability of emergence over a single year
-              })
-            }) %>% cbind(R_wts, .) %>% as.data.frame()
-            
-            # format df for plotting
-            colnames(Ps) = c("Rspill", Ss) #name columns
-            Ps_long = Ps %>% pivot_longer(cols = !Rspill,
-                                     names_to = "S",
-                                     values_to = "P") %>% as.data.frame
-
-            ## Plot
-            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
-              labs(x = "Rspill", y = "Spillover rate per year", title = paste0("mu is ", mu, " sigma is ", sigma), legend = "log10 P") +
-              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0)) +
-              geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black') +
-              theme_classic()
-  
-            return(plot)
-   })
-})
-
-plots
-#plot
-plots = do.call(c, (plots))
-do.call(grid.arrange, c(plots, nrow = 2))
 ```
 
