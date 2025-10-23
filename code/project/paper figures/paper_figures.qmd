@@ -411,7 +411,7 @@ sigmas = c(0.05, 0.1) #columns of grid
 
 R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
 Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
-Ss = seq(1, 10^5, 1000)
+#Ss = seq(1, 10^5, 1000) #for linear y
 
 #generate list of plots to format as grid
 plots = lapply(mus, function(mu){ #rows of grid
@@ -438,10 +438,10 @@ plots = lapply(mus, function(mu){ #rows of grid
                                      values_to = "P") %>% as.data.frame()
 
             ## Plot
-            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = (as.numeric(S)), fill = log10(P))) +
+            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
               labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), title = paste0("mu is ", mu, " sigma is ", sigma), legend = "log P") +
               scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
-              geom_contour(data = Ps_long, aes(x = Rspill, y = (as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black',linewidth = 1.5) +
+              geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black',linewidth = 1.5) +
               #aesthetics
               theme_classic() +
               theme(axis.text=element_text(size=24),
@@ -462,6 +462,78 @@ do.call(grid.arrange, c(plots, nrow = 2))
 #save 
 file = here("results", "paper figs", "fig_pandemic_potential.jpg")
 ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+```
+
+# Change in mpox $P_E$ post-Smallpox eradication 
+
+Below, we plot sample trajectories of $R_e$ and $S$ from 1980 as population immunity is lost. We assume complete (100%) vaccination coverage in 1980 and a reproductive number of $0.32$ in 1984 (Based on Blumberg and JLS estimation from 1980-1984 paper on fitting stuttering chains to $R_e$). $R_e$ and $S$ take the following forms: 
+
+$R_e = R_0(1-cF)$ and
+$S = S_0(1-cF)$ 
+
+where $F$ is the fraction of the population with immunity to smallpox, $c$ is the degree of cross-protection conferred by smallpox immunity agains mpox, $R_0$ is the basic reproductive number, and $S_0$ is the spillover rate in a completely unvaccinated population. 
+
+We can calculate $c$ by assuming different $R_0$ of mpox. We vary $R_0$ across figures and plot multiple sample trajectors of $S$ and $R_e$ for per figure varying $S_0$. 
+
+```{r define-re-S-functions}
+# functions 
+calc_c = function(f, R0, Re) {(1/f)*(1-(Re/R0))} #function to calculate c given re of a certain year, f of that year, and R0 
+Re_calc = function(f,R0,c) {R0*(1-c*f)}
+S_calc = function(f,S0,c) {S0*(1-c*f)}
+
+```
+
+```{r define-parms}
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+# Re-S trajectory parms 
+## variable parms
+R0_range = c(0.85, 0.95, 1.1, 1.3)
+S0_range = 10^c(3,4,5)
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+cs = sapply(R0_range, function(R0) calc_c(f = f.1984, Re = Re.1984, R0 = R0)) # calculating the cross-protection corresponding to each R0
+```
+
+```{r calculating-trajectories}
+# calculating Re and S over time for each c and S0 combination
+trajectories = lapply(R0_range, function(R0){ #iterate over each possible R0
+    dfs = lapply(S0_range, function(S0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+  trajectories.dfs = do.call(rbind, dfs) 
+})
+
+# naming dfs by assumed R0
+names(trajectories) = R0_range
 ```
 
 
