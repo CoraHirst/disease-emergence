@@ -490,7 +490,7 @@ R_adapted = 100000
 mu = 10^-3 #rows of grid
 sigma = 0.1 #columns of grid
 
-R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
 Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
 
 # Re-S trajectory parms 
@@ -535,6 +535,103 @@ trajectories = lapply(R0_range, function(R0){ #iterate over each possible R0
 # naming dfs by assumed R0
 names(trajectories) = R0_range
 ```
+
+lets create the heatmap df:
+
+```{r df-for-heatmap-with-trajectories}
+## set simulation parms for fig
+mu = mu # set mu for this plot
+sigma = sigma # set sigma for this plot
+
+## vector of ps
+ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
+        p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+
+## calculate total P for each ps and S combination
+Ps = sapply(Ss, function(S){ #outside is columns
+  sapply(ps, function(p){ #inside is rows
+    P = total_P(p, S, years=1) #probability of emergence over a single year
+  })
+}) %>% cbind(R_wts, .) %>% as.data.frame()
+
+# format df for plotting
+colnames(Ps) = c("Rspill", Ss) #name columns
+Ps_long = Ps %>% pivot_longer(cols = !Rspill,
+                         names_to = "S",
+                         values_to = "P") %>% as.data.frame()
+
+```
+
+and plot the trajectories:
+
+```{r plot-trajectories}
+#plot trajectories 
+plots_list = lapply(trajectories, function(trajectory){
+        plot = ggplot() + geom_point(data = trajectory, aes(x = Re, y = S, group = S0)) 
+        for(i in 1:length(S0_range)){
+          plot = plot + 
+          geom_segment(data = trajectory %>% filter(S0 == S0_range[i]), aes(x = Re, y = S, xend = c(tail(Re, n = -1),NA), yend = c(tail(S, n = -1),NA)), arrow = arrow(length = unit(0.2,"cm")))
+        }
+        return(plot)})
+
+do.call(grid.arrange, plots_list)
+
+# trajectories by 10 year intervals
+plots_list = lapply(trajectories, function(trajectory){
+        plot = ggplot() + geom_line(data = trajectory, aes(x = Re, y = S, group = S0)) 
+        for(i in 1:length(S0_range)){
+          plot = plot + 
+          geom_segment(data = trajectory %>% filter(S0 == S0_range[i], Year %% 10 == 0), aes(x = Re, y = S, xend = c(tail(Re, n = -1),NA), yend = c(tail(S, n = -1),NA)), arrow = arrow(length = unit(0.2,"cm")))
+        }
+        return(plot)})
+do.call(grid.arrange, plots_list)
+```
+
+let's put it together, and plot the heatmap together with trajectories:
+
+```{r heatmap-with-trajectories}
+#generate heatmap
+heatmap_base =  
+    ## Plot
+    plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
+      scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+      geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) +
+      scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
+      #aesthetics
+      theme_classic() +
+      theme(axis.text=element_text(size=24),
+            axis.title=element_text(size=24),
+            legend.title = element_text(size = 24), # Legend title font size
+            legend.text = element_text(size = 16)  # Legend key labels font size
+            )    
+
+#plot trajectories 
+plots_list = lapply(trajectories, function(trajectory){
+      #colors for plotting 
+      cols = brewer.pal(n = length(S0_range), name = "Greys")
+      names(cols) = S0_range
+      plot = heatmap_base  
+        for(i in 1:length(S0_range)){
+          plot = plot + 
+          geom_segment(data = trajectory %>% filter(S0 == S0_range[i], Year %% 10 == 0), 
+                       aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA)), colour = cols[i], 
+                       arrow = arrow(length = unit(0.2,"cm"))) +
+          geom_text(data = trajectory %>% filter(S0 == S0_range[i], Year %% 10 == 0), aes(x = Re, y = log10(S), label = Year),
+                     nudge_x = 0.02,
+                     nudge_y = .1,
+                    size = 2)
+        }
+      plot = plot + 
+        scale_color_manual(values = cols, labels = S0_range) +
+        labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), title = paste0(), fill = "log P", color = "S0")
+      return(plot)})
+
+#add titles
+
+do.call(grid.arrange, plots_list)
+```
+
+There is a time scale question here, where a probability of emergence being 1 in 100 per year suggests that within the next 100 years the emergence will occur. But over the next 100 years, immunity may continue to decay, and so the true probability of emergence should be calculated by considering the integral(in some way?) of the rate per year for 1/P(Emergence) years of the given Re/S0 trajectory. That is a *time to emergence* problem and we should consider it. 
 
 
 # Fraction to vaccinate to prevent disease emergence
