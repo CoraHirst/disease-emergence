@@ -278,6 +278,8 @@ plot = ggplot() +
                 axis.title = element_text(size = 25),
                 legend.title = element_text(size = 25),
                 legend.text = element_text(size = 25))
+# print plot
+print(plot)
 
 # save 
 file = here("results", "paper figs", "fig_subcritical_to_critical.jpg")
@@ -330,6 +332,10 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
         legend.title = element_text(size = 25), # Legend title font size
         legend.text = element_text(size = 25)  # Legend key labels font size
         )    
+
+#print plot
+print(plot) 
+
 #save 
 file = here("results", "paper figs", "fig_subcritical_to_high_R.png")
 ggsave(filename = file, plot = plot)
@@ -458,7 +464,7 @@ plots = lapply(mus, function(mu){ #rows of grid
 })
 
 #plot
-plots = do.call(c, (plots))
+plots = do.call("c", (plots))
 do.call(grid.arrange, c(plots, nrow = 2))
 
 #save 
@@ -524,7 +530,7 @@ plots = lapply(mus, function(mu){ #rows of grid
 })
 
 #plot
-plots = do.call(c, (plots))
+plots = do.call("c", (plots))
 do.call(grid.arrange, c(plots, nrow = 2))
 
 #save 
@@ -831,7 +837,7 @@ trajectories = do.call(rbind, trajectories)
 trajectories$PE.spill = sapply(trajectories$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
 
 # defining danger zone 
-dz.low = 10^-3
+dz.low = 10^-2
 dz.high = 10^-1
 trajectories = trajectories %>%
   mutate("PE" = total_P(PE.spill, S, years=1)) %>%
@@ -853,17 +859,20 @@ plot = ggplot() + geom_line(data = trajectories.dz, aes(x = Year, y = factor(R0)
          scale_color_manual(values = my.colors) +
          scale_linetype_manual(values = c("dotted", "solid", "dashed"), labels = sapply(log10(S0_range), function(S0){bquote(10^.(S0))}))
 
+#print plot
+print(plot)
+
 # save 
 file = here("results", "paper figs", "fig_risk_time.jpg")
 ggsave(filename = file, plot = plot)
 
 ```
 
-finally, we might want to shade the area on our survival plots where $P_E$ is in the danger zone to show just how much before this time emergence could be likely: 
+we might want to shade the area of time on our survival plots where $P_E$ is in the danger zone to show just how much before this time emergence could be likely: 
 
-```{r dz-cum-survival}
+```{r add-dz-survival}
 # defining danger zone 
-dz.low = 10^-3
+dz.low = 10^-2
 dz.high = 10^-1
 trajectories.singleS0.dz = trajectories.singleS0 %>%
   mutate("PE" = total_P(PE.spill, S, years=1)) %>%
@@ -888,8 +897,49 @@ survival.plot = survival.plot +
   annotate("rect", xmin = year.range[1], xmax = year.range[2], ymin = 0, ymax = 1, alpha = 0.25, fill = cols[i])
 }
 
+# print plot
 print(survival.plot)
 ```
+
+Finally, we will add the instantaneous probabilities of non-emergence for each $R_0$: 
+
+```{r add-inst-survival}
+#generate plot
+survival.plot = survival.plot +
+  geom_line(data = trajectories.singleS0, aes(x = Year, y = survival.prob, group = factor(R0), col = factor(R0)), linetype = "dashed") +
+  scale_linetype_manual(values = c("dashed" = "dashed"))
+
+#print plot
+survival.plot
+```
+
+We might want to flip the y axis such that the probability of emergence (rather than non-emergence) is plotted, and make some aesthetic adjustments. In the code chunk below, we generate this final plot: 
+
+```{r plot-cum-and-inst-emergence}
+## trajectories.singleS0.dz contains windows of danger zone, and trajectories.singleS0 contains intantaneous and cumulative survival probs
+
+# generate plot
+cumulative.emergence.plot = ggplot() + 
+  #cumulative and instantaneous emergence probabilities by R0
+  geom_line(data = trajectories.singleS0, aes(x = Year, y = 1- cum.survival, group = factor(R0), col = factor(R0), linetype = "cumulative"), linewidth = 1) +
+  geom_line(data = trajectories.singleS0, aes(x = Year, y = 1-survival.prob, group = factor(R0), col = factor(R0), linetype = "instantaneous"), linewidth = 1) +
+  #aesthetics
+  theme_bw() + 
+  labs(x = "Year", y = "Probability of Emergence", title = "cumulative and instantaneous probabilities of emergence by year", col = expression(R[0]), linetype = "") +
+                theme_bw() +
+         theme(axis.text=element_text(size=24),
+               axis.title=element_text(size=24),
+               legend.title = element_text(size = 24), # Legend title font size                  
+               legend.text = element_text(size = 16)) +  # Legend key labels font size
+         scale_color_manual(values = my.colors) +
+         scale_linetype_manual(values = c("cumulative" = "solid", "instantaneous" = "dotted"))
+  
+# add windows for emergence time between 1 in 10 and 1 in 100
+
+
+```
+
+
 
 # Fraction to vaccinate to prevent disease emergence
 
