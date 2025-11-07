@@ -383,7 +383,10 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
         axis.title=element_text(size=25),
         legend.title = element_text(size = 25), # Legend title font size
         legend.text = element_text(size = 25)  # Legend key labels font size
-        )    
+        )  
+
+#print plot
+print(plot)
 #save 
 file = here("results", "paper figs", "fig_subcritical_to_high_R_mus.png")
 ggsave(filename = file, plot = plot)
@@ -709,25 +712,28 @@ trajectories.singleS0 = lapply(trajectories, function(trajectory) {
 } )
 trajectories.singleS0 = do.call(rbind, trajectories.singleS0) #combine list to single df for easier plotting
 
-## Plot
+## Plot heatmap and contours
 plot = 
     ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) + #heatmap
       scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
       geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) 
-    for(i in R0_range){
-      plot = plot +
+
+#add trajectories
+for(i in R0_range[-3]){
+plot = plot +
       geom_segment(data = trajectories.singleS0 %>% filter(R0 == i, Year %% 10 == 0), 
             aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA), colour = factor(R0)), 
             arrow = arrow(length = unit(0.2,"cm")),
             linewidth = 1) +
-      geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %% 20 == 0), aes(x = Re, y = log10(S), label = Year),
-            nudge_x = 0,
-            nudge_y = 0,
+      geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %in% c(2000, 2030, 2080)), aes(x = Re, y = log10(S), label = Year),
+            nudge_x = -.010,
+            nudge_y = 0.1,
             fontface = "bold",
-            size = 2) 
+            size = 4) 
     }
-    plot = plot +
-      scale_color_manual(values = cols, labels = R0_range) +
+# aesthetics    
+plot = plot +
+      scale_color_manual(values = cols, labels = R0_range[-3]) +
       coord_cartesian(xlim = c(0.5, 1.05)) +
       labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), fill = "log P", color = expression(R[0])) +
       #aesthetics
@@ -738,7 +744,12 @@ plot =
             legend.title = element_text(size = 24), # Legend title font size
             legend.text = element_text(size = 16)  # Legend key labels font size
             )    
-plot
+#print plot
+print(plot)
+
+# save
+file = here("results", "paper figs", "fig_single_trajectories.jpg")
+ggsave(filename = file, plot = plot)
 ```
 
 There is a time scale question here, where a probability of emergence being 1 in 100 per year suggests that within the next 100 years the emergence will occur. But over the next 100 years, immunity may continue to decay, and so the true probability of emergence should be calculated by considering the integral(in some way?) of the rate per year for 1/P(Emergence) years of the given Re/S0 trajectory. That is a *time to emergence* problem and we should consider it. 
@@ -921,21 +932,37 @@ We might want to flip the y axis such that the probability of emergence (rather 
 # generate plot
 cumulative.emergence.plot = ggplot() + 
   #cumulative and instantaneous emergence probabilities by R0
-  geom_line(data = trajectories.singleS0, aes(x = Year, y = 1- cum.survival, group = factor(R0), col = factor(R0), linetype = "cumulative"), linewidth = 1) +
-  geom_line(data = trajectories.singleS0, aes(x = Year, y = 1-survival.prob, group = factor(R0), col = factor(R0), linetype = "instantaneous"), linewidth = 1) +
+  geom_line(data = trajectories.singleS0, aes(x = Year, y = (1 - cum.survival), group = factor(R0), col = factor(R0), linetype = "cumulative"), linewidth = 1) +
+  geom_line(data = trajectories.singleS0, aes(x = Year, y = (1-survival.prob), group = factor(R0), col = factor(R0), linetype = "instantaneous"), linewidth = 1) +
   #aesthetics
   theme_bw() + 
   labs(x = "Year", y = "Probability of Emergence", title = "cumulative and instantaneous probabilities of emergence by year", col = expression(R[0]), linetype = "") +
-                theme_bw() +
-         theme(axis.text=element_text(size=24),
-               axis.title=element_text(size=24),
-               legend.title = element_text(size = 24), # Legend title font size                  
-               legend.text = element_text(size = 16)) +  # Legend key labels font size
-         scale_color_manual(values = my.colors) +
-         scale_linetype_manual(values = c("cumulative" = "solid", "instantaneous" = "dotted"))
+  theme_bw() +
+  theme(axis.text=element_text(size=24),
+        axis.title=element_text(size=24),
+        legend.title = element_text(size = 24), # Legend title font size                  
+        legend.text = element_text(size = 16)) +  # Legend key labels font size
+  scale_color_manual(values = my.colors) +
+  scale_linetype_manual(values = c("cumulative" = "solid", "instantaneous" = "dotted")) 
   
 # add windows for emergence time between 1 in 10 and 1 in 100
+## colors for plotting 
+cols = my.colors[1:length(R0_range)]
+names(cols) = R0_range 
 
+## add to survival plot
+for(i in 1:length(R0_range)){
+  year.range = trajectories.singleS0.dz %>% filter(R0 == R0_range[i]) %>% pull(Year)
+cumulative.emergence.plot = cumulative.emergence.plot + 
+  annotate("rect", xmin = year.range[1], xmax = year.range[2], ymin = 0, ymax = 1, alpha = 0.25, fill = cols[i])
+}
+
+#print plot
+print(cumulative.emergence.plot)
+
+# save 
+file = here("results", "paper figs", "fig_cum_emergence.jpg")
+ggsave(filename = file, plot = cumulative.emergence.plot)
 
 ```
 
