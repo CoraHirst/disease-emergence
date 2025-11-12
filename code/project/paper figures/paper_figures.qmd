@@ -1018,3 +1018,52 @@ plot = ggplot() + geom_tile(data = F_prevent_long, aes(x = Rspill, y = Rp, fill 
 print(plot)
 ```
 
+# plotting $R_0$ as a function of $c$ and $f$ given some known $R_e$
+
+Below, we plot a heatmap of possible $R_0$ given a known $R_e$ and various combinations of cross-protection, $c$, and fraction immune, $F$. 
+
+```{r define-R0-calculation}
+#function to calculate R0 from Re
+R0_calc = function(Re, c, frac) {Re/(1-c*frac)}
+```
+
+```{r calc-R0}
+#params
+possible_cs = seq(0.5,1,0.01)
+
+possible_fracs = seq(0.5,1,0.01)
+
+Re = 0.34 # from JLS and Blumberg
+
+# matrix of R0 from Cs and Fracs
+possible_R0s = sapply(possible_cs, function(c){ #cols are cs
+  sapply(possible_fracs, function(frac){ #rows are fracs
+    R0 = R0_calc(Re = Re, c = c, frac = frac)
+  })
+}) 
+
+# format matrix 
+possible_R0s = (cbind(possible_fracs, possible_R0s)) # add column of fracs
+possible_R0s[is.infinite(possible_R0s)] = NaN
+
+colnames(possible_R0s) = c("Fv", possible_cs)
+
+possible_R0s = possible_R0s %>% as.data.frame() %>%
+  pivot_longer(
+    cols = !Fv,
+    names_to = "Ve",
+    values_to = "R0"
+  )
+```
+
+```{r plot-R0s}
+#generate heatmap
+plot = ggplot() + 
+  geom_tile(data = possible_R0s, aes(x = as.numeric(Ve), y = Fv, fill = R0)) + 
+  labs(x = "Ve", y = "Fraction Vaccinated")
+  theme_classic()
+
+#print plot
+print(plot)
+summary(possible_R0s)
+```
