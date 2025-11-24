@@ -1060,7 +1060,8 @@ possible_R0s = possible_R0s %>% as.data.frame() %>%
 #generate heatmap
 plot = ggplot() + 
   geom_tile(data = possible_R0s, aes(x = as.numeric(Ve), y = Fv, fill = R0)) + 
-  labs(x = "Ve", y = "Fraction Vaccinated")
+  labs(x = "Ve", y = "Fraction Vaccinated") +
+  scale_fill_continuous(trans = "log10") +
   theme_classic()
 
 #print plot
