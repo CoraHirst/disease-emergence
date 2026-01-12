@@ -418,7 +418,7 @@ Below, we plot how the probability of emergence of highly transmissible disease 
 ### define parm ranges
 R_adapted = 100000
 mus = c(10^-4, 10^-3) #rows of grid
-sigmas = c(0.05, 0.1) #columns of grid
+sigmas = c(0.01, 0.05) #columns of grid
 
 R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
 Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
@@ -574,7 +574,7 @@ Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots
 
 # Re-S trajectory parms 
 ## variable parms
-R0_range = c(0.85, 0.95, 1.1, 1.3)
+R0_range = c(0.85, 0.95, 1.05)
 S0_range = 10^c(3,4,5)
 
 ## F_immune over time
@@ -705,7 +705,7 @@ S0.to.plot = 10^4
       cols = brewer.pal(n = length(R0_range), name = "Greys")
       names(cols) = R0_range
 
-## create dataframe of trajectories for different R0 and a single R0
+## create dataframe of trajectories for different R0 and a single S0
 trajectories.singleS0 = lapply(trajectories, function(trajectory) {
   trajectory = trajectory %>% filter(S0 == S0.to.plot)
   return(trajectory)
@@ -719,28 +719,28 @@ plot =
       geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) 
 
 #add trajectories
-for(i in R0_range[-3]){
+for(i in R0_range){
 plot = plot +
       geom_segment(data = trajectories.singleS0 %>% filter(R0 == i, Year %% 10 == 0), 
             aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA), colour = factor(R0)), 
-            arrow = arrow(length = unit(0.2,"cm")),
-            linewidth = 1) +
+            arrow = arrow(length = unit(0.3,"cm")),
+            linewidth = 1.25) +
       geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %in% c(2000, 2030, 2080)), aes(x = Re, y = log10(S), label = Year),
-            nudge_x = -.010,
+            nudge_x = -0.01,
             nudge_y = 0.1,
             fontface = "bold",
             size = 4) 
     }
 # aesthetics    
 plot = plot +
-      scale_color_manual(values = cols, labels = R0_range[-3]) +
+      scale_color_manual(values = cols, labels = R0_range) +
       coord_cartesian(xlim = c(0.5, 1.05)) +
       labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), fill = "log P", color = expression(R[0])) +
       #aesthetics
       scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
       theme_classic() +
-      theme(axis.text=element_text(size=24),
-            axis.title=element_text(size=24),
+      theme(axis.text=element_text(size=26),
+            axis.title=element_text(size=26),
             legend.title = element_text(size = 24), # Legend title font size
             legend.text = element_text(size = 16)  # Legend key labels font size
             )    
