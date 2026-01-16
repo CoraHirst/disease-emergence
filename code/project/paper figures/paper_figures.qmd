@@ -471,8 +471,8 @@ plots = do.call("c", (plots))
 do.call(grid.arrange, c(plots, nrow = 2))
 
 #save 
-file = here("results", "paper figs", "fig_pandemic_potential.jpg")
-ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+#file = here("results", "paper figs", "fig_pandemic_potential.jpg")
+#ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
 ```
 
 We can plot the same curves with spillover rate on a linear scale to see just how striking the difference in interventions on spillover rate versus transmission truly are: 
@@ -643,6 +643,7 @@ Ps_long = Ps %>% pivot_longer(cols = !Rspill,
 
 let's put it together, and plot the heatmap together with trajectories:
 
+
 ```{r heatmap-with-trajectories}
 #generate heatmap
 heatmap_base =  
@@ -690,8 +691,8 @@ plots_list = lapply(trajectories, function(trajectory){
 do.call(grid.arrange, plots_list)
 
 ##save 
-file = here("results", "paper figs", "fig_Emergence_trajectories.jpg")
-ggsave(filename = file, plot = do.call(grid.arrange, plots_list))
+#file = here("results", "paper figs", "fig_Emergence_trajectories.jpg")
+#ggsave(filename = file, plot = do.call(grid.arrange, plots_list))
 
 ```
 
@@ -729,7 +730,7 @@ plot = plot +
             nudge_x = -0.01,
             nudge_y = 0.1,
             fontface = "bold",
-            size = 4) 
+            size = 5) 
     }
 # aesthetics    
 plot = plot +
@@ -751,6 +752,7 @@ print(plot)
 file = here("results", "paper figs", "fig_single_trajectories.jpg")
 ggsave(filename = file, plot = plot)
 ```
+
 
 There is a time scale question here, where a probability of emergence being 1 in 100 per year suggests that within the next 100 years the emergence will occur. But over the next 100 years, immunity may continue to decay, and so the true probability of emergence should be calculated by considering the integral(in some way?) of the rate per year for 1/P(Emergence) years of the given Re/S0 trajectory. That is a *time to emergence* problem and we should consider it. 
 
