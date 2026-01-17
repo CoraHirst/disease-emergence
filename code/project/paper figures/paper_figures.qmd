@@ -418,7 +418,7 @@ Below, we plot how the probability of emergence of highly transmissible disease 
 ### define parm ranges
 R_adapted = 100000
 mus = c(10^-4, 10^-3) #rows of grid
-sigmas = c(0.01, 0.05) #columns of grid
+sigmas = c(0.05, 0.1) #columns of grid
 
 R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
 Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
@@ -617,7 +617,7 @@ names(trajectories) = R0_range
 
 lets create the heatmap df:
 
-```{r df-for-heatmap-with-trajectories}
+```{r df-for-heatmap-with-trajectories-varyS0}
 ## set simulation parms for fig
 mu = mu # set mu for this plot
 sigma = sigma # set sigma for this plot
@@ -644,7 +644,7 @@ Ps_long = Ps %>% pivot_longer(cols = !Rspill,
 let's put it together, and plot the heatmap together with trajectories:
 
 
-```{r heatmap-with-trajectories}
+```{r heatmap-with-trajectories-varyS0}
 #generate heatmap
 heatmap_base =  
     ## Plot
@@ -695,6 +695,122 @@ do.call(grid.arrange, plots_list)
 #ggsave(filename = file, plot = do.call(grid.arrange, plots_list))
 
 ```
+
+We can also plot trajectories varying $R_0$ given a single $S_0$ and varying the combination of $\mu$ and $\sigma$ used to generate the heatmap of $P(Emergence)$. 
+
+```{r plot-heatmaps-with-trajectories-R0}
+#function pEmergence_supercrit_deltaR calculates the probability of evolution to R = 3 default
+#function total_P calculates the probability of emergence of a length of time years given spillover rate per year and proabability of emergence per spillover. 
+
+### define parm ranges
+R_adapted = 100000
+mus = c(10^-4, 10^-3) #rows of grid
+sigmas = c(0.05, 0.1) #columns of grid
+
+R_wts = seq(0.5, 1.05, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+#Ss = seq(1, 10^5, 1000) #for linear y
+
+## choose S0 to plot
+S0.to.plot = 10^4 
+
+## colors for plotting trajectories
+      cols = brewer.pal(n = length(R0_range), name = "Greys")
+      names(cols) = R0_range
+
+## create dataframe of trajectories for different R0 and a single S0
+trajectories.singleS0 = lapply(trajectories, function(trajectory) {
+  trajectory = trajectory %>% filter(S0 == S0.to.plot)
+  return(trajectory)
+} )
+trajectories.singleS0 = do.call(rbind, trajectories.singleS0) #combine list to single df for easier plotting
+
+#############################################################################################################
+
+#generate list of plots to format as grid
+plots = lapply(mus, function(mu){ #rows of grid
+          lapply(sigmas, function(sigma){ #columns of grid
+            ## set simulation parms for fig
+            mu = mu # set mu for this plot
+            sigma = sigma # set sigma for this plot
+            
+            ## vector of ps
+            ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
+                    p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+            ## calculate total P for each ps and S combination
+            Ps = sapply(Ss, function(S){ #outside is columns
+              sapply(ps, function(p){ #inside is rows
+                P = total_P(p, S, years=1) #probability of emergence over a single year
+              })
+            }) %>% cbind(R_wts, .) %>% as.data.frame()
+            
+            # format df for plotting
+            colnames(Ps) = c("Rspill", Ss) #name columns
+            Ps_long = Ps %>% pivot_longer(cols = !Rspill,
+                                     names_to = "S",
+                                     values_to = "P") %>% as.data.frame()
+
+            ## Plot
+            plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
+              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+              geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black',linewidth = 1.5)
+            
+            return(plot)
+   })
+})
+#concatenate plots list 
+plots = do.call("c", (plots))
+
+### add trajectories 
+plots = lapply(plots, function(heatmap){
+  #add trajectories
+  for(i in R0_range){
+  heatmap = heatmap +
+        geom_segment(data = trajectories.singleS0 %>% filter(R0 == i, Year %% 10 == 0), 
+              aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA), colour = factor(R0)), 
+              arrow = arrow(length = unit(0.3,"cm")),
+              linewidth = 1) +
+        geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %in% c(2000, 2030, 2080)), aes(x = Re, y = log10(S), label = Year),
+              nudge_x = -0.01,
+              nudge_y = 0.1,
+              fontface = "bold",
+              size = 3) 
+      }
+  # aesthetics    
+  heatmap = heatmap +
+        scale_color_manual(values = cols, labels = R0_range) +
+        coord_cartesian(xlim = c(0.5, 1.05)) +
+        labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), fill = "log P", color = expression(R[0])) +
+        #aesthetics
+        scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
+        theme_classic() +
+        theme(axis.text=element_text(size=20),
+              axis.title=element_text(size=20),
+              legend.title = element_text(size = 16), # Legend title font size
+              legend.text = element_text(size = 16)  # Legend key labels font size
+              )    
+  return(heatmap)
+  })
+
+#plot
+do.call(grid.arrange, c(plots, nrow = 2))
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_trajectories.jpg")
+ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+```
+
+we can do a similar plot considering the "pre-adapted" pathway: 
+
+
+```{r heatmap-trajectories-pre-adapted}
+
+
+
+
+```
+
 
 and if we want just a single plot with a few trajectories on it: 
 
