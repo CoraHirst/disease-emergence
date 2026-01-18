@@ -471,8 +471,8 @@ plots = do.call("c", (plots))
 do.call(grid.arrange, c(plots, nrow = 2))
 
 #save 
-#file = here("results", "paper figs", "fig_pandemic_potential.jpg")
-#ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+file = here("results", "paper figs", "fig_pandemic_potential.jpg")
+ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
 ```
 
 We can plot the same curves with spillover rate on a linear scale to see just how striking the difference in interventions on spillover rate versus transmission truly are: 
