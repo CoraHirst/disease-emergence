@@ -57,7 +57,7 @@ First, mortality is reported in the number of deaths (in thousands) per age. For
 
 ```{r death-rates}
 # extract mortality dataframe from congo_demographics
-deaths= congo_demographics$mortality %>% #longform for easier manipulation
+deaths = congo_demographics$mortality %>% #longform for easier manipulation
   pivot_longer(
     cols = !Year,
     names_to = "Age", 

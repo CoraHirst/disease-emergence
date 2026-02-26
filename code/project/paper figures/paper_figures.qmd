@@ -123,6 +123,7 @@ plot = ggplot() +
   #plotting proportion immune
   geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
   geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
+  geom_vline(xintercept = 2023, linetype = "dashed", linewidth = 2) +
   #adding labels
   scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative effective R ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
   scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)) +
@@ -807,6 +808,9 @@ and if we want just a single plot with a few trajectories on it:
 ## choose S0 to plot
 S0.to.plot = 10^4 
 
+## R0 range smaller so plot clearer
+R0_range = c(0.85, 0.95, 1.05)
+
 ## colors for plotting trajectories
       cols = brewer.pal(n = length(R0_range), name = "Greys")
       names(cols) = R0_range
@@ -835,20 +839,20 @@ plot = plot +
             nudge_x = -0.01,
             nudge_y = 0.1,
             fontface = "bold",
-            size = 5) 
+            size = 8) 
     }
 # aesthetics    
 plot = plot +
       scale_color_manual(values = cols, labels = R0_range) +
       coord_cartesian(xlim = c(0.5, 1.05)) +
-      labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), fill = "log P", color = expression(R[0])) +
+      labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log10 spillover rate ", year^-1)), fill = expression(paste("log10 ", P[p])), color = expression(R[0])) +
       #aesthetics
       scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
       theme_classic() +
-      theme(axis.text=element_text(size=26),
-            axis.title=element_text(size=26),
-            legend.title = element_text(size = 24), # Legend title font size
-            legend.text = element_text(size = 16)  # Legend key labels font size
+      theme(axis.text=element_text(size=35),
+            axis.title=element_text(size=35),
+            legend.title = element_text(size = 30), # Legend title font size
+            legend.text = element_text(size = 26)  # Legend key labels font size
             )    
 #print plot
 print(plot)
