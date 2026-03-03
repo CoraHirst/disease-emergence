@@ -4,5 +4,6 @@ install.packages("ggplot2")
 install.packages("tidyverse")
 install.packages("nleqslv")
 install.packages("gridExtra")
+install.packages("parallel")
 # Saving Snapshot of these packages
 renv::snapshot() #run to save a snapshot of installed packages

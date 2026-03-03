@@ -1,0 +1,598 @@
+---
+title: "heatmaps"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv) #for solving nonlinear equations
+
+# colors for plotting
+num_cols = 30
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+## plotting the total probability of emergence
+
+The total probability of emergence (of a highly transmissible disease, $R \approx 3$) in a given year is a function of the probability of emergence per spillover ($p$) and the rate of spillovers per year ($S$). The number of spillovers per year is the rate of spillovers multiplied by the unit time, 1 year, such that $n = S(1) = S$. Treating disease emergence as a bernoullie process, the total probability of emergence in a year can be calculated as:
+
+$$ 
+P = 1 - (1-p)^{n}
+$$
+
+$p$ is a function of the initial reproductive number after spillover, $R_{spill}$; the mate at which adaptive mutations are aquired per-infection, $\mu$; and, importantly, the proportional increase in fitness conferred by a beneficial mutation, $\sigma$. We note that changes in the reproductive number of a variant due to non-pharameutical interventions that change contact rates (such as social distancing) can affect both $S$ and $\sigma$. We thus plot a series of heatmaps showing the total probability of emergence over the course of a year given a range of mutation rates and spillover R for various combinations of $S$ and $\sigma$.
+
+## load functions
+
+We will need two functions: a function to calculate the probability of emergence per spillover ($p$) and a function that calculates the total probability of emergence in a given interval of time, $P$.
+
+We load these two functions from the file `\code\functions\functions.R`.
+
+```{r load-functions}
+source(here("code", "functions", "functions.R"))
+
+```
+
+# setting our range of parameters
+
+```{r params}
+## probability per spillover parameters
+R_wts = seq(0.75, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+sigmas = c(0.02, 0.05, 0.1)
+mus = 10^seq(-6,-2, by = 0.1) # and mu
+
+## total emergence parameters
+Ss = c(100, 1000) #spillovers/year
+years = 1 #time interval in which to calculate probability
+
+```
+
+In the code chunk below, we generate `r length(Ss)*length(sigmas)` different heatmaps that plot the total probability of emergence over the course of `r years` years given a range of $R_{spill}$ and $\mu$. Each of the 6 plots corresponds with one combination of $\sigma$ and $S$.
+
+```{r generate-plots}
+# calculating probability of emergence during a year
+plots = lapply(Ss, function(S){
+           lapply(sigmas, function(sigma){
+          # set parms for total p
+            S = S #spillover rate
+          
+            ## matrix of ps
+            ps = sapply(mus, function(mu){ #iterates over all spillover R and mu combinations - outermost sapply is columns
+                    sapply(R_wts, function(R_spill){
+                    p = pEmergence_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) # generates a matrix containing probabilities of emergence per spillover
+                  })
+                }) %>% as.data.frame() 
+           
+          # solve for total emergence probability 
+            P = apply(ps, c(1,2), function(p) {total_P(p = p, S = S, years = years)}) %>% as.data.frame() # generates a matrix containing Total emergence probabilities from total_P calculation, converts to data frame
+            P = cbind(R_wts, P) %>% as.data.frame()
+            colnames(P) = c("Rspill", mus) # columns are mus
+            
+            
+          # create a plot
+            ## transforms data frame to long form
+            P_long = P %>% pivot_longer(cols = !Rspill,
+                                        names_to = "mu",
+                                        values_to = "P") %>%
+              as.data.frame()
+            
+            ## plots long form df
+            plot = ggplot() + geom_tile(data = P_long, aes(x = Rspill, y = log10(as.numeric(mu)), fill = log10(P))) +
+                      labs(x = "R spill", y = "mu", fill = "P", title = paste0("sigma is ", sigma, " and S is ", S)) + 
+                      scale_y_continuous(breaks = seq(-6, -2, by = 1)) +
+                      scale_fill_gradientn(colours = my.colors, na.value = "cadetblue") +
+                      geom_contour(data = P_long, aes(x = Rspill, y = as.numeric(log10(as.numeric(mu))), z = log10(P)), breaks = c(-3,-1), col = 'maroon') +
+                      theme_classic()
+            
+            
+            return(plot)
+            
+        })
+  })
+
+#returns a list of length(S) lists containing length(sigmas) elements
+```
+
+```{r plot-plots}
+# plot list of plots with grid.arrange
+plots_list = do.call(c, plots) #concatenates list of lists into a single list
+do.call(grid.arrange, c(plots_list, ncol = 3)) #plots all lists together 
+```
+
+# Takeaways
+
+It's clear that changes to the benefit in transmission gained by a mutation ($\sigma$) affects the emergence probability to a much greater extent than changes in the number of spillovers.
+
+# Change in mpox $P_E$ post-Smallpox eradication 
+
+Below, we plot sample trajectories of $R_e$ and $S$ from 1980 as population immunity is lost. We assume complete (100%) vaccination coverage in 1980 and a reproductive number of $0.32$ in 1984 (Based on Blumberg and JLS estimation from 1980-1984 paper on fitting stuttering chains to $R_e$). $R_e$ and $S$ take the following forms: 
+
+$R_e = R_0(1-cF)$ and
+$S = S_0(1-cF)$ 
+
+where $F$ is the fraction of the population with immunity to smallpox, $c$ is the degree of cross-protection conferred by smallpox immunity agains mpox, $R_0$ is the basic reproductive number, and $S_0$ is the spillover rate in a completely unvaccinated population. 
+
+We can calculate $c$ by assuming different $R_0$ of mpox. We vary $R_0$ across figures and plot multiple sample trajectors of $S$ and $R_e$ for per figure varying $S_0$. 
+
+```{r define-re-S-functions}
+# functions 
+calc_c = function(f, R0, Re) {(1/f)*(1-(Re/R0))} #function to calculate c given re of a certain year, f of that year, and R0 
+Re_calc = function(f,R0,c) {R0*(1-c*f)}
+S_calc = function(f,S0,c) {S0*(1-c*f)}
+
+```
+
+```{r define-parms}
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+
+# Re-S trajectory parms 
+## variable parms
+R0_range = c(0.85, 0.95, 1.1, 1.3)
+S0_range = 10^c(3,4,5)
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+cs = sapply(R0_range, function(R0) calc_c(f = f.1984, Re = Re.1984, R0 = R0)) # calculating the cross-protection corresponding to each R0
+```
+
+```{r calculating-trajectories}
+# calculating Re and S over time for each c and S0 combination
+trajectories = lapply(R0_range, function(R0){ #iterate over each possible R0
+    dfs = lapply(S0_range, function(S0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("R0" = R0, "S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+  trajectories.dfs = do.call(rbind, dfs) 
+})
+
+# naming dfs by assumed R0
+names(trajectories) = R0_range
+```
+
+lets create the heatmap df:
+
+```{r df-for-heatmap-with-trajectories}
+## set simulation parms for fig
+mu = mu # set mu for this plot
+sigma = sigma # set sigma for this plot
+
+## vector of ps
+ps = sapply(R_wts, function(R_spill){ # iterates over all spillover R for a given mu and sigma 
+        p = pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+
+## calculate total P for each ps and S combination
+Ps = sapply(Ss, function(S){ #outside is columns
+  sapply(ps, function(p){ #inside is rows
+    P = total_P(p, S, years=1) #probability of emergence over a single year
+  })
+}) %>% cbind(R_wts, .) %>% as.data.frame()
+
+# format df for plotting
+colnames(Ps) = c("Rspill", Ss) #name columns
+Ps_long = Ps %>% pivot_longer(cols = !Rspill,
+                         names_to = "S",
+                         values_to = "P") %>% as.data.frame()
+
+```
+
+let's put it together, and plot the heatmap together with trajectories:
+
+```{r heatmap-with-trajectories}
+#generate heatmap
+heatmap_base =  
+    ## Plot
+    plot = ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) +
+      scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+      geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) +
+      scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
+      #aesthetics
+      theme_classic() +
+      theme(axis.text=element_text(size=24),
+            axis.title=element_text(size=24),
+            legend.title = element_text(size = 24), # Legend title font size
+            legend.text = element_text(size = 16)  # Legend key labels font size
+            )    
+
+#colors for plotting trajectories
+      cols = brewer.pal(n = length(S0_range), name = "Greys")
+      names(cols) = S0_range
+      
+#plot trajectories 
+plots_list = lapply(trajectories, function(trajectory){
+      # add trajectories
+      plot = heatmap_base 
+        for(i in unique(S0_range)){
+          plot = plot + 
+          geom_segment(data = trajectory %>% filter(S0 == i, Year %% 10 == 0), 
+                       aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA), colour = factor(S0)), 
+                       arrow = arrow(length = unit(0.2,"cm")),
+                       linewidth = 1) +
+          geom_text(data = trajectory %>% filter(S0 == i, Year %% 10 == 0), aes(x = Re, y = log10(S), label = Year),
+                     nudge_x = 0.02,
+                     nudge_y = .1,
+                    size = 2)
+        }
+      
+      #aesthetics
+      plot = plot + 
+        scale_color_manual(values = cols, labels = sapply(log10(S0_range), function(S0){bquote(10^.(S0))})) +
+        coord_cartesian(xlim = c(0.5, 1.05)) +
+        labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log spillover rate ", year^-1)), title = bquote(paste(R[0] == .(unique(trajectory$R0)))), fill = "log P", color = expression(S[0]))
+      return(plot)})
+
+#add titles
+do.call(grid.arrange, plots_list)
+
+```
+
+There is a time scale question here, where a probability of emergence being 1 in 100 per year suggests that within the next 100 years the emergence will occur. But over the next 100 years, immunity may continue to decay, and so the true probability of emergence should be calculated by considering the integral(in some way?) of the rate per year for 1/P(Emergence) years of the given Re/S0 trajectory. That is a *time to emergence* problem and we should consider it. 
+
+# Cumulative Survival Probability
+
+one way to consider this problem is to plot, for a given trajectory, the survival curve of the spillover events. The number of spillovers per year as well as probability of emergence given spill (through Re) are increasing along the trajectory, and so the probability of not having an emergence event decreases over time. From 1980 - 2080, we can plot the product of the probabilities that every year leading up to the current year there was *not* an emergence event. 
+
+```{r survival-curve-parms}
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+
+# Re-S trajectory parms 
+## variable parms
+R0 = 0.95 
+S0_range = 10^c(3,4,5) #three trajectories
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+c = calc_c(f = f.1984, Re = Re.1984, R0 = R0) # calculating the cross-protection corresponding to each R0
+```
+
+```{r calculating-trajectories}
+# calculating Re and S over time for each S0
+dfs = lapply(S0_range, function(S0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+
+trajectories.df = do.call(rbind, dfs) 
+
+```
+
+```{r calculating-survival-prob}
+# calculating p_emergence per spill
+trajectories.df$PE.spill = sapply(trajectories.df$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
+
+# add survival/cum survival probs 
+trajectories.df = trajectories.df %>% 
+  group_by(S0) %>%
+  mutate("survival.prob" = (1-PE.spill)^S) %>% #probability of not emerging that year 
+  mutate("cum.survival" = cumprod(survival.prob)) #cumulative probability of not emerging
+
+```
+
+and plot the probability of non emergence up until each year: 
+
+```{r plot-survival-prob}
+plot = ggplot() + 
+  geom_line(data = trajectories.df, aes(x = Year, y = log10(cum.survival), group = factor(S0), col = factor(S0)))
+
+plot
+
+```
+
+lets try a more traditional survival plot?
+```{r calculating-survival-prob}
+
+# calculating p_emergence per spill
+trajectories.df$PE.spill = sapply(trajectories.df$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
+
+# add proportion that don't lead to epidemic
+trajectories.df = trajectories.df %>% 
+  group_by(S0) %>%
+  mutate("num.survive" = S - PE.spill*S) %>%
+  mutate("num.emerge" = PE.spill*S) %>%
+  mutate("cum.survival.prop" = cumsum(num.survive)/cumsum(S)) #cumulative probability of not emerging
+
+ggplot() + geom_line(data = trajectories.df, aes(x = Year, y = cum.survival.prop, group = factor(S0), col = factor(S0)))
+
+ggplot() + geom_line(data = trajectories.df, aes(x = Year, y = log10(num.emerge), group = factor(S0), col = factor(S0))) +
+  geom_hline(yintercept = 1)
+
+```
+
+finally, lets do the same for multiple R0: 
+
+```{r define-parms-multiple-trajectories}
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+
+# Re-S trajectory parms 
+## variable parms
+R0_range = c(0.85, 0.95, 1.1, 1.3)
+S0_range = 10^c(3,4,5)
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+cs = sapply(R0_range, function(R0) calc_c(f = f.1984, Re = Re.1984, R0 = R0)) # calculating the cross-protection corresponding to each R0
+```
+
+```{r calculate-multiple-trajectories}
+
+# calculating Re and S over time for each c and S0 combination
+trajectories = lapply(R0_range, function(R0){ #iterate over each possible R0
+    dfs = lapply(S0_range, function(S0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("R0" = R0, "S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+  trajectories.dfs = do.call(rbind, dfs) 
+})
+
+# single long form df
+trajectories = do.call(rbind, trajectories)
+
+```
+
+```{r calculating-survival-prob}
+# calculating p_emergence per spill
+trajectories$PE.spill = sapply(trajectories$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
+
+# add survival/cum survival probs 
+trajectories = trajectories %>% 
+  group_by(R0, S0) %>%
+  mutate("survival.prob" = (1-PE.spill)^S) %>% #probability of not emerging that year 
+  mutate("cum.survival" = cumprod(survival.prob)) %>% #cumulative probability of not emerging
+  mutate("num.survive" = S - PE.spill*S) %>%
+  mutate("num.emerge" = PE.spill*S) %>%
+  mutate("cum.survival.prop" = cumsum(num.survive)/cumsum(S)) #cumulative probability of not emerging
+
+```
+
+```{r plot-multiple-survival}
+ggplot() + geom_line(data = trajectories, aes(x = Year, y = cum.survival, group = interaction(R0,S0), col = factor(R0), linetype = factor(S0)))
+
+ggplot() + geom_line(data = trajectories, aes(x = Year, y = cum.survival.prop, group = interaction(R0,S0), col = factor(R0), linetype = factor(S0)))
+
+ggplot() + geom_line(data = trajectories, aes(x = Year, y = log10(num.emerge), group = interaction(R0,S0), col = factor(R0), linetype = factor(S0))) + geom_hline(yintercept = 1)
+
+```
+
+
+These aren't very informative, I feel. But what might be? 
+
+What we would *really* like to do is to compare how the cumulative probability of emergence over time differs when $R_e$ and $S$ decrease due to waning.
+
+```{r trajectory-parms}
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+
+# Re-S trajectory parms 
+## variable parms
+R0_range = c(0.85, 0.95, 1.1, 1.3)
+S0 = 10^4 
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+cs = sapply(R0_range, function(R0) calc_c(f = f.1984, Re = Re.1984, R0 = R0)) # calculating the cross-protection corresponding to each R0
+
+```
+
+```{r calculate-trajectories}
+
+# calculating Re and S over time for each c and S0 combination
+trajectories = lapply(R0_range, function(R0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("R0" = R0, "S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+  trajectories = do.call(rbind, trajectories) 
+
+```
+
+```{r calculating-survival-prob}
+# calculating p_emergence per spill
+trajectories$PE.spill = sapply(trajectories$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
+
+# add survival/cum survival probs 
+trajectories = trajectories %>% 
+  group_by(R0) %>%
+  mutate("survival.prob" = (1-PE.spill)^S) %>% #probability of not emerging that year 
+  mutate("cum.survival" = cumprod(survival.prob)) %>% #cumulative probability of not emerging
+  mutate("num.emerge" = PE.spill*S) 
+```
+
+We would have to think critically about what $P(Emergence)$ to pick and keep constant to compare to on this figure
+
+The time spent in the "danger zone" for each R0 and S0 combination. 
+
+```{r }
+# PE heatmap parms
+### define parm ranges
+R_adapted = 100000
+mu = 10^-3 #rows of grid
+sigma = 0.1 #columns of grid
+
+R_wts = seq(0.1, 1, by = 0.01) #wt R0s to test, x axis of plots
+Ss = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+
+
+# Re-S trajectory parms 
+## variable parms
+R0_range = c(0.85, 0.95, 1.1, 1.3)
+S0_range = 10^c(3,4,5)
+
+## F_immune over time
+f_immune = proportion_immune %>% select(Year, prop_immune) 
+
+## calculating c 
+Re.1984 = 0.32 #estimated effective reproductive number 
+f.1984 = f_immune %>% filter(Year == 1984) %>% pull(prop_immune) # portion immune in year of estimated effective reproductive number
+
+cs = sapply(R0_range, function(R0) calc_c(f = f.1984, Re = Re.1984, R0 = R0)) # calculating the cross-protection corresponding to each R0
+
+```
+
+```{r }
+# calculating Re and S over time for each c and S0 combination
+trajectories = lapply(R0_range, function(R0){ #iterate over each possible R0
+    dfs = lapply(S0_range, function(S0){ #iterate over each S0 in a completely susceptible pop to calculate trajectories over time
+        Re_S = sapply(f_immune$prop_immune, function(f){ #iterate over every year and calculate the Re and S resulting from that year's proportion immune to smallpox
+          # calculate c from R0
+          c = calc_c(f = f.1984, Re = Re.1984, R0 = R0)
+         
+           #calculate Re from f and R0
+          Re = Re_calc(f = f, c = c, R0 = R0)
+          
+          #calculate Se from f and S0
+          S = S_calc(f = f, S0 = S0, c = c)
+          
+          #return a vector of 2 values: Re and S
+          return(c("Re" = Re, "S" = S))
+        })  %>% #returns a matrix of 2 rows (Re and S) and length(prop_immune) columns corresponding to year
+        t(.) %>% cbind("R0" = R0, "S0" = S0, "Year" = f_immune$Year, .) %>% as.data.frame()  #transposes array so columns are Re and S, adds column of years, and converts to DF
+      return(Re_S)
+    })
+  #combine all dataframes of Re and S corresponding to one S0 as a long form df
+  trajectories.dfs = do.call(rbind, dfs) 
+})
+
+# single long form df
+trajectories = do.call(rbind, trajectories)
+
+```
+
+```{r }
+# calculating p_emergence per spill
+trajectories$PE.spill = sapply(trajectories$Re, function(Re) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = Re, R_adapted = R_adapted)})
+
+# defining danger zone 
+dz.low = 10^-3
+dz.high = 10^-1
+trajectories = trajectories %>%
+  mutate("PE" = total_P(PE.spill, S, years=1)) %>%
+  mutate("danger.zone" = case_when(
+    PE < dz.high & PE > dz.low ~ T,
+    .default = F
+  ))
+
+trajectories.dz = trajectories %>% filter(danger.zone == T)
+
+#plot years spent in DZ
+plot = ggplot() + geom_line(data = trajectories.dz, aes(x = Year, y = factor(R0), group = interaction(R0,S0), col = factor(S0)), position = position_dodgev(height = 0.3), linewidth = 2) +
+         labs(x = "Year", y = expression(R[0]), title = "Time spent in danger zone", col = expression(S[0])) +
+                theme_bw() +
+         theme(axis.text=element_text(size=24),
+                axis.title=element_text(size=24),
+                legend.title = element_text(size = 24), # Legend title font size                  
+                legend.text = element_text(size = 16)) +  # Legend key labels font size
+         scale_color_manual(values = my.colors)
+
+```
+

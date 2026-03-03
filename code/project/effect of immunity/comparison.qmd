@@ -1,0 +1,327 @@
+---
+title: "comparison"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+Loading functions for evolution calculations, waning immunity calculations, etc.
+
+```{r load-analytical-functions}
+source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
+```
+
+```{r load-data-analysis-functions}
+source(here("code", "functions", "analysis_functions.R"))
+```
+
+# Objective
+
+Both the rate at which zoonoses spill into human populations and the probability that zoonoses evolve high transmissibility after spillover are reduced when immunity is introduced into a population. The goal of this document is to compare how changes to these two different parameters - spillover rate, $\rho$ and initial basic reproductive number of spillover infections, $R_o$ - effect the overall probability of disease emergence. 
+
+Both $\rho$ and $\R_o$ will change linearly with the fraction of the population immune to infection. However, as we've observed in `code/project/R less than 1/AdaptiveEvolutionModelDevelopment.qmd`, the probability that a disease evolves high transmissibility increases nonlinearly and sharply with $R_o$. Thus, while the overall probability of disease emergence will change proportional to the number of spillover events over a given period of time, the same change in $R_o$ is likely to lead to a dramatically changed probability of emergence. 
+
+In the following document, we observe the contributions of changing $\rho$ and $R_o$ to the overall change in the probability of disease emergence as vaccination changes the fraction of a population immune to infection.
+
+
+# Total probability of disease emergence
+
+The overall probability that an infectious disease emerges over a given period of time depends both on the number of spillover infections that over that period of time ($N$) and the probability that each spillover event evolves into a highly infectious disease ($p_E$.) 
+
+Given a rate of $\rho$ spillover infections per year, the probability that the infectious disease emergese over the course of a year is given as: 
+
+$$
+P_E = 1- (1-p_E)^\rho
+$$
+
+In other words, the probability that the infectious disease emerges is the probability that at least one of the $\rho$ spillover infections successfully evolves to high transmissibility. 
+
+# The effect of population immunity on $\rho$ and $R_O$
+
+As members of a population become immune to infection, the frequency of interactions between infected individuals and susceptible individuals decreases proportionally. This means that both $R_o$, the number of individuals an infected person infects on average, and $\rho$, the number of infections caused by host jumps from the animal reservoir to humans, change linearly with the fraction of immunity the population. 
+
+We can illustrate how $R$ and $\rho$ would approach their innate values (what the cross-species or human-human infectivity would be in a completely unvaccinated population) as immunity is lost in a rapidly growing country like the Congo after the end of smallpox ciruclation and vaccination. The proportion of the population born before 1980 is calculated in the file `code/data analysis/congo/matrix_model_projections.qmd` and is saved in `results/congo/proportion_immune.csv`.
+
+In the code chunk below, we load the calculated proportion of the population immune from 1980-2023 and projected from 2023 to 2080 as a data frame: 
+
+```{r load-congo-data}
+#read in csv file as data frame
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+
+#inspect
+head(proportion_immune)
+
+```
+
+We can plot the changes in the proporiton of the population immune over time: 
+
+```{r plot-immunity-over-time}
+#plot fraction of the population immune over time from Congo matrix model calculations
+plot = ggplot() + 
+            geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = "black") + #from reported demographics
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + #projections from most recent demographics in red
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme_bw()  
+
+print(plot) #print to screen
+
+```
+
+As the density of immune individuals in the population decays, the frequency of interactions between infected individuals (either animal or human) and susceptible individuals that successfully lead to new infection increases.
+
+Both $\rho$ and $R$ will change as $\rho = \rho_o(1-cf_v)$ and $R = R_o(1-cf_v)$, where $\rho_o$ and $\R_o$ are the values of these parameters in a completely vaccinated population. A slight adjustment to this can be made to accound for the fact that immunity to smallpox might not be entirely protective against mpox, such that a portion of protection ($c$) conferred against smallpox is conferred against mpox, yielding $\rho = \rho_o(1-cf_v)$ and $R = R_o(1-cf_v)$
+
+Below, we calculate how $R$ and $\rho$ of mpox will approach their maximum in an unvaccinated population without mutation as immunity wanes, that is, $\frac{R}{R_o}$ and $\frac{\rho}{\rho_o}$, for various levels of cross protection conferred by smallpox vaccination. Note that the aforementioned functions are loaded from `functions.r` and `analysis_functions.r` at the start of this document.
+
+
+```{r changing-R-and-rho-calculation}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected
+
+#calculate
+##create a matrix with year and predicted Re_r0  and rho/rho0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+
+
+```
+
+and we visualize this in the plot below: 
+
+```{r changing-R-and-rho-plot}
+#plot from previous calculations
+plot = ggplot() + 
+  #plotting relative effective R and rho
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  #plotting proportion immune
+  geom_point(data = proportion_immune %>% filter(Year <= 2023), aes(x = Year, y = (prop_immune)), col = "black") + geom_line(data = proportion_immune, aes(x = Year, y = (prop_immune)), col = " black") + 
+            geom_point(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "red") +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "fraction of population immune to Smallpox, fv", sec.axis = sec_axis(~., name = "relative effective R and Rho")) +
+  labs(x = "Year", title = "increase in Mpox reproductive number", color = "cross immunity, c") +
+  theme_bw()
+
+print(plot) # print to screen
+```
+
+# How do changes in $\rho$ due to population immunity change $P_E$? 
+
+The frequency of spillover infections will decrease proportional to the density of immune individuals in the population. The following plot shows the extent to which changes in spillover rate due to population immunity changes the probability that a virus evolves high transmissibility. 
+
+The probability of emergence per spillover infection ($p_E$) depends on the rate (per infection) at which infections are initiated by a variant with a beneficial mutation (which we term $\mu$) and the increase in transmissibility conferred by a beneficial mutation (which we assume is proportional to the transmissibility of the previous variant by a factor of $/delta R$). We illustrate the change in $P_E$ due to changes in $\rho$ by population immunity for a virus with a $\mu = 10^-3$ and $\delta R = 0.02$. 
+
+## $P_E$ as a function of $N$
+
+We must first observe the behavior of $P_E$ as a function of $N$. In the code chunk below, we define the function of $P_E = 1-(1-p_e)^N$.
+
+```{r define-PE-N}
+# define total probability of emergence as f(n,p_e)
+P_E = function(N, p_e) {1-(1-p_e)^N} #probability that not all 
+
+```
+
+and calculate $P_E$ as a function of $N$, given a few different values of $p_E$. These values are chosen after visual inspection of the range of $p_E$ given a range of $\mu$ and $\Delta R$ visualized in `code/project/R less than 1/AdaptiveEvolutionModelDevelopment.qmd`
+
+```{r calculate-PE-N}
+# parameter ranges
+Ns = 10^seq(0,8, by = 0.1)
+p_es = 10^seq(-8, -3, by = 1)  #define p_es 
+
+# calculate P_E
+P_Es = sapply(p_es, function(p) {sapply(Ns, function(n) {P_E(N = n, p_e = p)})}) %>% 
+  cbind(Ns, .) %>% #add column for Ns, independent variable
+  as.data.frame() #as data frame for dplyr to pivot to long form
+
+# format data frame for easier referencing
+colnames(P_Es) = c("N", as.character(p_es))
+
+# pivot to long form
+P_Es = P_Es %>% 
+  pivot_longer(cols = !N, 
+               names_to = "p_e",
+               values_to = "P_E")
+```
+
+finally, we plot the dependence of $P_E$ on $N$ and $p_e$ below: 
+
+```{r plot-PE-N}
+# total probability of emergence
+plot1 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(N), y = P_E, group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  geom_line(data = P_Es, aes(x = log10(N), y = P_E, group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Total probability of emergence, PE, per unit time") +
+  labs(x = "Log10 number of spillovers per unit time, log10(N)", title = "Probability of emergence by log10 N", color = "log10 probability per spillover, pe") +
+  theme_bw()
+
+#log10 total probability of emergence
+plot2 = ggplot() +
+  geom_point(data = P_Es, aes(x = log10(N), y = log10(P_E), group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  geom_line(data = P_Es, aes(x = log10(N), y = log10(P_E), group = as.factor(log10(as.numeric(p_e))), col = as.factor(log10(as.numeric(p_e))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Log10 Total probability of emergence, log10(PE), per unit time") +
+  labs(x = "Log10 number of spillovers per unit time, log10(N)", title = "Log10 Probability of emergence by log10 N", color = "log10 probability per spillover, pe") +
+  theme_bw()
+
+#plot together
+grid.arrange(plot1, plot2, nrow = 2)
+```
+
+The log probability of emergence increases nearly linearly with the log number of spillovers, but saturates near 1 at high N. The value at which emergence saturates depends on the the $p_e$, with the probability of emergence nearing one at around the same order of magnitude of spillovers (not the right phrase, but 10^-5 saturates at 10^5, and so on)
+
+## $P_E$ as a function of $R$
+
+We can also observe the effect of $R$ on $P_E$, given no change in $N$, for multiple different values of $N$. 
+
+We will refer to the previously defined function of $P_E = 1-(1-p_e)^N$ and calculate $p_e$ as a function of $R$, given a few different values of $N$. These values are chosen on account of what may be a reasonable rate of spillover on a per-year basis, and spans logs to account for uncertaintly in the rate of successful infection from zoonotic reservoir into people.
+
+We calculate $p_e$ from $R$ from the equation developed in `code/project/R less than 1/AdaptiveEvolutionModelDevelopment.qmd`, which was saved in and loaded from the file `code/functions/functions.r`. 
+
+```{r calculate-PE-R}
+# parameter ranges
+Ns = 10^seq(2,6, by = 1) #define spillover number per year
+Rs = seq(.5, 1.5, by = 0.01)  #define p_es 
+
+# calculate P_E
+P_Es = sapply(Ns, function(n) {sapply(Rs, function(R) {
+    pe = pEmergence_supercrit_deltaR(delta_R = 0.05, mu = 10^-3, R_wt = R, R_adapted = 10^5) #mu is 10^-3, delta R is 0.05
+    return(P_E(N = n, p_e = pe))
+    })
+  }) %>% #calculate P_E for each combination of pe and N
+  cbind(Rs, .) %>% #add column for Ns, independent variable
+  as.data.frame() #as data frame for dplyr to pivot to long form
+
+# format data frame for easier referencing
+colnames(P_Es) = c("Rwt", as.character(Ns)) 
+
+# pivot to long form
+P_Es = P_Es %>% 
+  pivot_longer(cols = !Rwt, 
+               names_to = "N",
+               values_to = "P_E")
+```
+
+We can plot the results below: 
+
+```{r plot-PE-pe}
+# total probability of emergence
+plot1 = ggplot() +
+  geom_point(data = P_Es, aes(x = Rwt, y = P_E, group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  geom_line(data = P_Es, aes(x = Rwt, y = P_E, group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Total probability of emergence, PE, per unit time") +
+  labs(x = "Rwt", title = "Probability of emergence by Rwt", color = "log10 number of spillover events per year, N") +
+  theme_bw()
+
+#log 10 total probability of emergence
+plot2 = ggplot() +
+  geom_point(data = P_Es, aes(x = Rwt, y = log10(P_E), group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  geom_line(data = P_Es, aes(x = Rwt, y = log10(P_E), group = as.factor(log10(as.numeric(N))), col = as.factor(log10(as.numeric(N))))) +
+  scale_color_manual(values = my.colors) +
+  scale_y_continuous(name = "Log10 total probability of emergence, PE, per unit time") +
+  labs(x = "Rwt", title = "Probability of emergence by Rwt", color = "log10 number of spillover events per year, N") +
+  theme_bw()
+
+#plot together
+grid.arrange(plot1, plot2)
+
+```
+The dependence of $P_E$ on $p_e$ is similar in character to the dependence of $P_E$ on $N$, saturating in magnitude at some $p_e$ inversely equivalent to the number of spillovers per year. 
+
+
+## How do changes small changes in $N$ and $R_0$ due to population immunity $f_v$ effect the overall probability of emergence?
+
+Because $N$ and $R$ have confounding effects, to determine the change in $P_E$ conferred by a change in one and not the other requires understanding what that change would look like given a few different values of the other. As such, we will make a grid of different combinations of the $R$ used to observe the effect of changing $N$ and $N$ used to observe the effect of chaning $R$. 
+
+First, we define a vecotr of $p_e$ spanning multiple logs, and calculate the $R$ that confers these $p_e$ given a $\mu = 10^{-3}$ and $\Delta R = 0.02$.
+
+```{r calculate-Rs}
+# range of p_es for which we'd like Rs
+ps = 10^seq(-6,-3, by = 1)
+
+# defining mutation parameters
+mu = 10^-3 # 1 in 1000 infections gives rise to a new better transmitting variant
+delta_r = 0.02 # 2% increase in transmissibility with mutation
+
+# defining candidate Rs
+rs = seq(0.5,1.5, by = 0.01) 
+
+# algorithm for finding the R that confers ps per spillover
+df = sapply(rs, function(r) {pEmergence_supercrit_deltaR(delta_R = delta_r, mu = mu, R_wt = r, R_adapted = 10^3)}) %>%
+  cbind(rs, .) %>%
+  as.data.frame()
+
+# 
+
+
+
+```
+
+We define that grid of combinations in the code chunk below.
+
+```{r define-pe-n-combos}
+# range of p_es to test
+ps = 10^seq(-6,-3, by = 1)
+
+#ranges of ns to test
+ns = 10^seq(3, 6, by = 1)
+
+# matrix of combinations
+ps_by_ns = expand.grid(ps,ns) 
+
+# name columns for referencing
+colnames(ps_by_ns) = c("pe", "n") #column 1 is pe, column 2 is n
+```
+
+In the following section, we calculate the effect of changing $R_0$ or $N$, either independently or together, on the probability of emergence. 
+
+```{r plot-algorithm}
+#define fvs 
+fvs = seq(0.01, 1, by = 0.01)
+
+# for a given pe and N
+#caclulating changes in PE due to changing n: 
+p = p
+n = n
+
+sapply(fvs, function(fv) {})
+
+
+
+```
+
+
+Problems:
+
+1) how do we pick which R for $R_0$? in some ranges changes are much steeper than others
+
+2) how do we pick which $N_0$? Should I plot $P_E$ against N first to see the sensitivity? 
+
+3) Most likely solution - we pick a few $N_0$ and $R_0$ to look at changes due to $F_v$ over.... as in , maybe 3 different figures for both R and N... although how do we pick which ones to plot together? or do we keep them seperate maube? it would be nice to plot together... maybe we don't care which is greater, just the rate at which the difference changes with different levels of population immunity. That seems like the way to go...

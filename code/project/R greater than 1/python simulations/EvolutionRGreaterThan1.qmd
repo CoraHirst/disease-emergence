@@ -1,0 +1,414 @@
+---
+title: "Python Simulation Results, R > 1"
+subtitle: "Doc.2 Python simulation results - evolution of Mpox to high transmissibility when spillover R > 1"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+
+# colors for plotting
+num_cols = 20
+my.colors = colorRampPalette(brewer.pal(n = 8, name = "Set2"))(num_cols)
+```
+
+# Objective
+
+The objective of this document is to process and analyze the output of a python simulation of the multi-step branching process of the adaptation of a virus with a near critical (though slightly greater than 1) $R_0$ out of a zoonotic source. 
+
+# Loading simulation results
+
+The output of the python simulation is stored in `python simulations/output2.csv`. This is a `.csv` file containing a dataframe of statistics calculated from 1000 iterations of each of 200 parameter combinations. These parameter regimes simulated the branching process with different combinations of the spillover R, $Rwt$, of the disease and the step increase in transmissibility with a given mutation, $\Delta R$. We assumed the final R of highest transmissibility would be 3, and that a beneficial mutation would emerge and transmit with a probability of 1/1000 infections ($\mu = 10^{-3}$). 
+
+```{r load-sim-results}
+results = read.csv(here("code", "project", "R greater than 1", "python simulations", "output2.csv"))
+```
+
+Now lets go ahead and plot the probability of evolution to high transmissibility.
+
+```{r plot-pHigh}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+```
+
+Here we can compare this to the probability that the process does not go extinct before the second type emerges (the extinction probability for a GW process with lambda = Rwt)
+
+```{r non-extinction probability}
+#nonlinear equation solver to solve for fixed point of the generating function for the branching process
+
+## define branching process generating function for offspring distribution
+bp_singletype = function(x) {y = exp(Rwt*(x-1)) - x} #fixed point solution will be this function set to 0
+
+## define initial conditions 
+init = 1 #start with single spillover infection meep meep
+
+## start fixed point guess
+xstart = 0.5 #50 percent will go extinct so lets see
+
+## solve for non extinction probability (1-Pextinction)
+non_extinction = function(Rwt) {
+  Rwt = Rwt #set Rwt
+  return(1 - nleqslv(xstart, bp_singletype, method="Newton", global="none", control=list(trace=1,stepmax=2))$x) #solve for nonextinction probability
+  }
+
+# solve to plot
+rwt = seq(1.01, 2, by = 0.01)
+pNE = NaN
+for(i in 1:length(rwt)){
+  Rwt = rwt[i]
+  pNE[i] = non_extinction(Rwt)
+}
+
+#solve 1-1/r0 
+ap = 1-(1/rwt)
+
+```
+
+I have saved this function as `non_extinction()` in `code\functions\functions.R`. 
+
+Now we can plot our predictions based on the non-extinction probability of a branching process starting with a single case with the spillover Rwt. 
+
+```{r plot-pHigh-preds}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = rwt, y = pNE)) +
+  geom_line(aes(x=rwt, y = ap), col = "red") +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+```
+
+And lets plot the number of generations at 1) emergence and 2) extinction. 
+
+```{r plot-generations}
+plot2 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = Emergent_generation, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Generation of emergence", col = "Increase with Mutation", title = "Mean generation of emergence, spillover R > 1")
+
+plot3 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = Extinct_generation, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Generation of extinction", col = "Increase with Mutation", title = "Mean generation of extinction, spillover R > 1")
+
+grid.arrange(plot2,plot3)
+```
+
+Finally, lets plot the size of the extinction events. Unfortunately I was dumb and didn't take into account that calculating the mean emergent size with NaNs requires an explicit ignorance of NaNs in python. Ugh. 
+
+```{r plot-size}
+plot4 = ggplot() +
+  geom_line(data = results, aes(x = Rwt, y = log10(Extinct_size), group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Size at extinction", col = "Increase with Mutation", title = "Mean size at extinction, spillover R > 1")
+
+plot4
+```
+
+I reran and was less stupid so here's emergence.
+
+```{r plot-size-emergence}
+plot5 = ggplot() +
+  geom_point(data = results, aes(x = Rwt, y = log10(Emergent_size), group = factor(deltaR), col = factor(deltaR))) +
+  geom_line(data = results, aes(x = Rwt, y = log10(Emergent_size), group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Size at emergence", col = "Increase with Mutation", title = "Mean size at emergence, spillover R > 1")
+
+plot5
+
+```
+
+# Greater than but close to one
+
+I reran the simulations but choosing the wildtype R to be closer to 1. I'll load those results here: 
+
+```{r load-sim-2-results}
+results2 = read.csv(here("code", "project", "R greater than 1", "python simulations", "output2.csv"))
+
+```
+
+And plot how the probability of emergence changes as a function of the number of mutations and wildtype R: 
+
+```{r plot-pHigh-2}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+plot
+```
+
+and finally see how this compares with the approximation being the non-extinction probability of the first type: 
+
+```{r non-extinction-probability-2}
+#nonlinear equation solver to solve for fixed point of the generating function for the branching process
+# solve to plot
+rwt = seq(range(results2$Rwt)[1], range(results2$Rwt)[2], by = diff(range(results2$Rwt))/nrow(results2))
+pNE = NaN
+for(i in 1:length(rwt)){
+  Rwt = rwt[i]
+  pNE[i] = non_extinction(Rwt)
+}
+
+```
+
+```{r plot-pHigh-preds}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_line(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_point(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = rwt, y = pNE)) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save
+file = here("results", "analysis", "R greater than 1", "fig_P_evolution_smallR.png")
+ggsave(filename = file, plot = plot)
+```
+
+So really, the divergence is happening for R wt between 1 and 1.05. I think? that is okay?
+
+Let's look at the other stats?
+
+```{r plot-final-size-emergence-smallR}
+plot = ggplot() + 
+  geom_line(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = Emergent_size, group = factor(deltaR), col = factor(deltaR))) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "final size when emergent", col = "Increase with Mutation", title = "Total number of cases when highly transmissible variant emerges, spillover R > 1")
+
+plot
+```
+
+This one makes sense, because a lot of the sizes get too big and go extinct or don't get big at all, so the "sample size" when taking the mean changes. 
+
+# Best approximation for the probability of emergence of $R \ge 3$ type
+
+Another potential approximation avenue is that we follow a similar approximation for the branching process extinction probabilities as we followed for the emergence probability ($R < 1$ to $R \ge 1$). 
+
+That is, we can solve for the non-extinction probabilities of a branching process with evolution to a mutant type with some $R \ge 3$, but setting the R of the final type to some very large R such that the probability of extinction of the final type is 0. 
+
+I have written this function in `code\functions\functions.R` and will write it here to observe. 
+
+```{r multitype-bp-supercritical-R}
+######## evenly dispersed distribution described by generating functions for secondary cases
+pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
+  ### calculate number of variants
+  m = ceiling(((3 + 10^-12) - R_wt)/delta_R) + 1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  
+  ### define R0 vector 
+  R0 = R_wt + (delta_R)*(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
+  R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  
+  ### define probability of emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting lineage
+  
+  ### define fixed point equations from PGFs
+  ## system of nl equations to solve
+  multi_mut <- function(x) { # for poisson dist. the mean is R_0 and the generating function is exp(R0(s -1))
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i] # fixed point from probability generating function 
+    }
+    y[m] = exp(-R0[m]*(1-x[m])) - x[m] # can only make type m, regardless of mutation. 
+    y
+  }
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[1] = 1 #except for 1 case of the starting type
+  
+  ### define initial guess for fixed point vector
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[1] = 0 #except for the prob of a linneage started by our 1 starting case type 1
+  
+  ### solve for fixed points
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #solve system of nonlinear equations for fixed point
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init) #solve for 1-sum(q_i^init(i)) - should be q_1^1 for a single starting case of type 1 
+  
+  return(prob.emergence) 
+}
+
+
+```
+
+Notice the choice of the initial guess is close to 0 - we want the least fixed-point solution to the series of nonlinear equations. 
+
+Below, I compare the two approximations to the simulation results. Note that while the non-extinction of the first type approximation does not depend on the $\Delta R$, the approximate solution to the non-extinction probabilities of a branching process with evolution to an infinite final type does depend on $\Delta R$. I will plot the analytical solutions for this approximation for each delta R simulated. 
+
+```{r multitype-bp-approximations}
+### non-extinction of Rwt approximation 
+rwt = seq(range(results2$Rwt)[1], range(results2$Rwt)[2], by = diff(range(results2$Rwt))/nrow(results2))
+delta_Rs = unique(results2$deltaR)
+
+### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+```
+
+And now we can plot the two approximations together with the simulation results:
+
+```{r plot-comparison-approximations}
+# plot probability of evolution to high R
+plot = ggplot() +
+  geom_point(data = results2 %>% filter(deltaR != 1), aes(x = Rwt, y = pEmergent, group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(aes(x = rwt, y = pNE)) +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = pNE_mtbp, group = delta_R, col = delta_R), linetype = "dotted") +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving high transmissibility", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save
+file = here("results", "analysis", "R greater than 1", "fig_P_evolution_smallR.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+The new approximations are in colored dotted lines. We can see that while the approxiamtion still underestimates the emergence probabilities, it is much better than the nonextinction probability of the first type. 
+
+# Proportional Increase in Delta R
+
+BIG NOTE: I have changed the function to be proportional increase (exponential increase in R0 of each type) rather than step increase (linear). I need to rerun my simulations to account for this. We can try to do that on this computer but may need to run it at work instead. Womp.  
+
+Update: ran on my laptop and it worked great. no womp. Just yay!
+
+Below I redefine the analytic solution to the branching process model defined in the function `pEmergence_supercrit_deltaR` such that the transmissibility, $R$, of each type increases proportional to the last type by a factor of $\Delta R$. 
+
+This function has replaced the stepwise function previously saved in `\code\functions\functions.R`
+
+```{r multitype-proportional-deltaR}
+pEmergence_supercrit_deltaR = function(delta_R, mu, R_wt, R_adapted) {
+  m = ceiling((log10(3) - log10(R_wt))/log10(1+delta_R)) + 1 #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  
+  ### define R0 vector 
+  R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
+  R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  
+  
+
+  ### define probability of emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting lineage
+  
+  ### define fixed point equations from PGFs
+  ## system of nl equations to solve
+  multi_mut <- function(x) { # for poisson dist. the mean is R_0 and the generating function is exp(R0(s -1))
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i] # fixed point from probability generating function 
+    }
+    y[m] = exp(-R0[m]*(1-x[m])) - x[m] # can only make type m, regardless of mutation. 
+    y
+  }
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[1] = 1 #except for 1 case of the starting type
+  
+  ### define initial guess for fixed point vector
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[1] = 0 #except for the prob of a linneage started by our 1 starting case type 1
+  
+  ### solve for fixed points
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #solve system of nonlinear equations for fixed point
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init) #solve for 1-sum(q_i^init(i)) - should be q_1^1 for a single starting case of type 1 
+  
+  return(prob.emergence) 
+}
+```
+
+I have both simulated (`\code\project\R greater than 1\python simulations`) have solved this function for the probability of evolution of supercritical variants to high ($R >= 3$) transmissibility. Below, I plot the results of the stochastic simulations against the branching process solutions. 
+
+Note that the branching process analyticial solutions are, too, an approximation. We solve for the nonextinction probability of a branching process that evolves with a proportion increase towards an $R>=3$ but the contribution of the extinction probability of the final type is negligible, as this type has a very high transmissibility. Thus, we are solving for the probability of nonextinction before the final type is reached. 
+
+In the code chunk below, I load the results of the stochastic simulations. 
+
+```{r load-sims-5}
+results5 = read.csv(here("code", "project", "R greater than 1", "python simulations", "output5.csv"))
+```
+
+And here I calculate the approximate solutions to the probability that an epidemic starting with some R does not go extinct before becoming highly transmissible ($R>=3$) the stochastic simualations against the branching process solution: 
+
+```{r solutions-BP}
+### non-extinction of Rwt approximation 
+rwt = seq(range(results5$Rwt)[1], range(results5$Rwt)[2], by = diff(range(results5$Rwt))/nrow(results5))
+delta_Rs = unique(results5$deltaR)
+
+### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+```
+
+```{r MT-BP-stoachastic-approximation}
+plot = ggplot() +
+  geom_point(data = results5, aes(x = Rwt, y = (pEmergent), group = factor(deltaR), col = factor(deltaR)), alpha = 0.5) +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = (pNE_mtbp), group = delta_R, col = delta_R), linetype = "dotted") +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  labs(x = "initial R", y = "Probability of evolving R > 3", col = "Increase with Mutation", title = "Probability of evolving high transmissibility, spillover R > 1")
+
+#save
+file = here("results", "analysis", "R greater than 1", "fig_P_evolution_smallR_proportional.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+Of course if we'd like to capture probabilities lower than $10^{-3}$ via stochastic simulation I would need to run greater than 1000 simulations for each parameter regime. 
+
+
+
