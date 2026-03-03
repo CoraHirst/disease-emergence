@@ -1,0 +1,370 @@
+---
+title: "Exploring Multi-type Branching Processes"
+subtitle: "Recapitulating the results of Antia 2003"
+format: pdf
+execute:
+  echo: false
+  warning: false
+bibliography: ../../assets/bibFiles/dataanalysis-references.bib
+csl: ../../assets/bibFiles/apa.csl
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(nleqslv) #for solving nonlinear systems of equations
+
+#load functions
+source(here("code", "functions", "Nature_2003_functions.R"))
+
+## colors for plotting
+my.colors = c("black", "orange", "red", "forestgreen", "blue")
+```
+
+# Objective
+
+We are interested in exploring the probability that a zoonotic pathogen evolves efficient human-human transmission (emergence) after spilling over into a human population, and, in particular, how the probability of disease emergence changes with the level of immunity in the population.
+
+When the first infection caused by a spillover event from the animal reservoir into humans has an $R_0 < 1$, a short chain of transmission may stochastically occur before the pathogen goes extinct in the human population. 
+
+During these stuttering chains of human-human transmission, selection may act on mutations acquired during infection and the zoonotic pathogen may evolve a higher $R_0$. 
+
+These ideas were initially explored in @AntiaNature2003, wherein the probability of disease emergence as a function of 1) mutation rate, 2) number of mutations required for specialization to the new host, and 3) fitness of intermediate mutations, were modeled using a multi-type branching process framework. 
+
+The goal of this document is to develop and plot the same model in @AntiaNature2003. We will explore the biological motivation for the model, and how it can be modified to explore different questions. 
+
+# Single mutation model (2-type branching process)
+
+Epidemics emerge from zoonoses when the pathogen spills over into the human population and its subsequent spread is maintained in the population. For the latter to occur, the pathogen must have a basic reproductive number, $R_0$, greater than 1. The $R_0$ of the first infection may already be greater than 1, such that the pathogen transmits well in humans immediately after spillover. This may not need to be the case. @AntiaNature2003 explores how pathogens may evolve an $R_0 > 1$ during stochastic transmission in humans even when the $R_0$ of the first infection is less than 1. 
+
+In the simplest case, only 1 mutation is required for the $R_0$ of the pathogen to exceed 1. The stochastic chain of infections after spillover in this scenario can be modeled with a 2-type branching process, with type $1$ corresponding to infections cause by the wild-type (spillover) variant and type $2$ corresponding to infections caused by the human-adapted variant, where: 
+  
+- the total number of secondary infections arising from an individual infected with variant $1$ is Poisson-distributed with mean $R_0^{(1)}$ (the basic-reproductive number of infections with the wild-type pathogen);
+- the number of secondary infections of type $1$ from an infection of type $1$ is poisson-distributed with mean $(1-\mu)R_0^{(1)}$, and
+- the number of secondary infections of type $2$, the adapted type, from an infection of type $1$ is poisson-distributed with mean $\mu R_0^{(1)}$, and 
+- the total number of secondary infections arising from an individual infected with variant $2$ is Poisson-distributed with mean $R_0^{(2)}$ (the basic-reproductive number of infections with the human-adapted pathogen). Note that infections with the human-adapted pathogen, type $2$, *only* give rise to other type $2$ infections with mean $R_0^{(2)}$.
+
+## Figure 2a
+
+The probability that the pathogen evolves to give rise to a human-adapted infection, type $2$, before extinction depends strongly on the $R_0$ of the introduced pathogen:
+
+```{r fig-2a, results = "hide"}
+#single mutation required for evolution 
+## parms 
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
+R_adapted = 1 #  R_0 of human-adapted type 2 infection
+mus = c(10^-1, 10^-2, 10^-3, 10^-4) # mus to test 
+
+# matrix to store emergence probabilities
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus)) #rows correspond to R_wt, cols to mu
+
+# solve for emergence probability for each mu, R_wt combination
+for(j in 1:length(mus)){
+  #set mu
+  mu = mus[j] 
+  for(i in 1:length(R_wts)){
+   # set R_wt
+    R_wt = R_wts[i]
+   # solve for emegence probability and add to probs.emergene matrix
+   probs.emergence[i,j] = pEmergence_single(mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", as.character(formatC(mus, format = "e", digits = 1))) # add mu names to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+ pivot_longer(cols = !R0,
+  names_to = "mu",
+  values_to = "Prob.Emergence"
+)
+
+# Plot the probability of emergence as a function of the initial R_0, R_01, for each mutation rate
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = mu, col = mu)) + #line plot
+  theme_bw() + #sets background color to white and grey gridlines
+  labs(title = "fig 2a", x = "R0 of introduced pathogen", y = "Probability of emergence") + #axis labels
+  scale_y_continuous(trans = "log10") + #log10 y axis
+  scale_color_manual(values = my.colors) #use predefined color vector from r setup chunk
+
+```
+
+Note that "probability of evolution" is slightly different from "probability of emergence" - we will get to this at some point. 
+
+While the emergence probability scales almost linearly with $\mu$, the emergence probability is strongly dependent upon the $R_0$ of the first infection, $R_0^{(1)}$ (which is the same as the $R_0$ of all infections of type $1$). The emergence probability increases sharply with high $R_0$ particularly for low $\mu$. 
+
+## Fig 2b
+
+Even with an $R_0 > 1$, a transmission chain can still stochastically go extinct. The probability of emergence - that is, that an epidemic is achieved before the transmission chain goes extinct - is thus dependent upon the $R_0$ of the human-adapted strain, or the $R_0$ of infections of type $2$, $R_0^{(2)}$.
+
+Below, we plot the extinction probabilities of transmission chains as a function of the $R_0^{(1)}$ of the introduced pathogen when the $R_0^{(2)}$ is either $1,000, 1.5,$ or $1.2$, corresponding to the solid, dashed, and dotten lines respectively. We plot these three curves for two mutation rates $(10^{-1})$ and $10^{-3}$.
+
+
+```{r fig-2b, results = "hide"}
+#single mutation required for evolution 
+## parms 
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen, type 1 infections
+R_adapteds = c(10^3,1.5,1.2) #  R_0 of human-adapted type 2 infection
+mus = c(10^-1, 10^-3) # mus to test 
+
+#list to store matrices of emergence probabilities calculated with each mu
+probs.emergence.list = list()
+
+# simulate - will result in two dfs of emergence probabiliies v R_wt for different R_adapteds corresponding to the mu assumed while running simulations
+c = 1 # count refers to which mu to assume in vector of mus, and thus the element of the list to which we will be saving
+while(c <= length(mus)){
+  #set mutation rate
+    mu = mus[c] 
+  # matrix to store emergence probabilities for R_01 and R_adapted combinations
+  probs.emergence = matrix(nrow = length(R_wts), ncol = length(R_adapteds)) #rows correspond to R_wt, cols to R_adapted
+  # solve for emergence probability for each R_adapted, R_wt combination
+    for(j in 1:length(R_adapteds)){
+      #set R_adapted
+      R_adapted = R_adapteds[j] 
+      for(i in 1:length(R_wts)){
+       # set R_wt
+        R_wt = R_wts[i]
+       # solve for emegence probability and add to probs.emergene matrix
+       probs.emergence[i,j] = pEmergence_single(mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+      }
+    }
+  
+  ### prepare probs.emergence for plotting
+  # format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(R_adapteds)) # add mu names to columns
+  
+  # pivot to longform and store in df list
+  probs.emergence.list[[c]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "R_adapted",
+    values_to = "Prob.Emergence"
+  )
+
+c = c+1 #next mu  
+}
+
+
+#plot
+ggplot() + 
+  geom_line(data = probs.emergence.list[[1]], aes(x = R0, y = Prob.Emergence, group = R_adapted, linetype = R_adapted, col = "10^-1")) +
+  geom_line(data = probs.emergence.list[[2]], aes(x = R0, y = Prob.Emergence, group = R_adapted, linetype = R_adapted, col = "10^-3")) +
+  theme_bw() + #sets background color to white and grey gridlines
+  labs(title = "fig 2b", x = "R0 of introduced pathogen", y = "Probability of emergence", col = "mu", linetype = "R0 of adapted") + #axis labels
+  scale_y_continuous(trans = "log10") +
+  scale_linetype_manual(values = c("1.2" = "dotted", "1.5" = "dashed", "1000" = "solid")) +
+  scale_color_manual(values = c("10^-1" = "black", "10^-3" = "forestgreen")) 
+
+```
+
+# Multipe-step mutation model (m-type branching process)
+
+The single-mutation model can be extended to a model that considers how the probability of emergence depends on the number of evolutionary changes required for the pathogen to attain $R_0 > 1$. 
+
+This process can be captured by a branching process with more than 2 types, corresponding to the number of variants that exist in the evolutionary path from the wild-type variant that causes the first infection to the fully adapted variant with an $R_0 > 1$. 
+
+## fig 3a
+
+In figure 3a of @AntiaNature2003, the emergence probabilities are calculated as a function of the $R_0$ of the spillover variant, $R_0^{(1)}$ as the number of steps required to adapt increases. This model **assumes that the fitness of all intermediate variants is the same as the $R_0$ of the spillover variant**, that is, that $R_0^{(1)} = R_0^{(2)} = ... = R_0^{(m-1)}$**, and only the fully adapted variant has an $R_0$ that increases such that $R_0^{(m)} > 1$.
+
+The model also assumes that infections with variant $i$ only give rise to infections of the same type, $i$, or of the type with one more mutation, $i+1$, and: 
+  - the total number of secondary infections arising from an individual infected with variant $i$ is Poisson-distributed with mean $R_0^{(1)}$ (the        basic-reproductive number of infections with the wild-type pathogen);
+  - the number of secondary infections of type $i$ from an infection of type $i$ is poisson-distributed with mean $(1-\mu)R_0^{(i)}$, and
+  - the number of secondary infections of type $i+1$, with one more mutation, from an infection of type $i$ is poisson-distributed with mean $\mu          R_0^{(i)}$, and 
+  - the total number of secondary infections arising from an individual infected with variant $m$ is Poisson-distributed with mean $R_0^{(m)}$ (the        basic-reproductive number of infections with the adapted-type pathogen)
+  
+It should be noted that the paper refers to $n$ to indicate the number of intermediate variants between type $1$ and type $m$, such that:
+
+- $n=0$ corresponds to a model with m=2 types, the wild type with $R_0^{(1)} < 1$ and the adapted type with $R_0^{(2)} > 1$, and 
+- $n = 4$ corresponds to a model with m=6 types, the wild type with $R_0^{(1)}<1$, 4 intermediate types with $R_0^{(i)} = R_0^{(1)}$ for $i \in \{2...5\}$ and the adapted type with $R_0^{(6)} > 1$
+
+I'll use the same notation ($n$) as in the paper for clarity. 
+
+```{r fig-3a, results = "hide"}
+## parms
+R_wts = seq(0,1.2, by = 0.01) # R_0 of infection with introduced pathogen and all type 1:(m-1) infections
+R_adapted = 1.2 #  R_0 of human-adapted type m infection
+mu = 10^-1 # mutation rate
+ns = 0:4 #m = 2:6
+
+# matrix to store emergence probabilities
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(ns)) #rows correspond to R_wt, cols to number of intermediats
+
+# solve for emergence probability for each mu, R_wt combination
+for(j in 1:length(ns)){
+  #set mu
+  n = ns[j] 
+  for(i in 1:length(R_wts)){
+   # set R_wt
+    R_wt = R_wts[i]
+   # solve for emegence probability and add to probs.emergene matrix
+   probs.emergence[i,j] = pEmergence_jackpot(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+colnames(probs.emergence) = c("R0", as.character(ns)) # add n names to columns
+
+# pivot to longform 
+probs.emergence.long = probs.emergence %>% # columns R0, n, and Prob.emergence give Prob emergence for each combination of R_wt and n
+ pivot_longer(cols = !R0,
+  names_to = "n",
+  values_to = "Prob.Emergence"
+)
+
+# Plot the probability of emergence as a function of the initial R_0, R_01, for each mutation rate
+ggplot() + 
+  geom_line(data = probs.emergence.long, aes(x = R0, y = Prob.Emergence, group = n, col = n)) + #line plot
+  theme_bw() + #sets background color to white and grey gridlines
+  labs(title = "fig 3a", x = "R0 of introduced pathogen", y = "Probability of emergence", col = "# intermediates, n") + #axis labels
+  scale_y_continuous(trans = "log10", limits = c(10^-5,1)) + #log10 y axis
+  scale_color_manual(values = my.colors) #use predefined color vector from r setup chunk
+
+
+```
+
+## fig 3b
+
+In figure 3b, the assumption that the $R_0$ of all intermediates is the same as the $R_0$ of the introduced pathogen is relaxed. Instead, three different fitness landscapes are explored: 
+
+1) the jackpot landscape, where only the final mutation increases $R_0$ from the $R_0$ of the introduced pathogen (same as figure 3a); 
+2) the additive landscape, where the intermediate mutations increase $R_0$ by a fixed amount until the final mutation shifts $R_0 > 1$, and
+3) the fitness valley landscape, where the intermediate mutations can decrease $R_0$ 
+
+These models are only explored for the $n=1$ intermediate case, that is, for a 3-type branching process with 1 wildtype, 1 intermediate, and 1 adapted type. 
+
+However, the functions in `\code\functions\Nature_2003_functions.R` allow us to explore these for the m-type case. 
+
+```{r fig-3b, results = "hide"}
+## parms ##########################################################
+R_wts = seq(0,1, by = 0.01) # R_0 of infection with introduced pathogen and all type 1:(m-1) infections
+R_adapted = 1.5 #  R_0 of human-adapted type m infection
+mus = c(10^-1, 10^-3) # mutation rate
+n = 1 # 1 intermediate, 3 types
+
+#list to store matrices of emergence probabilities calculated with each model
+probs.emergence.list = list()
+
+######################## jAckpot model ###########################
+
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+
+#jackpot model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_jackpot(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R_wts column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[1]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
+
+######################## Additive model ###########################
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+  
+#additive model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_additive(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[2]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
+
+######################## Valley model ###########################
+#matrix to store probabilities 
+probs.emergence = matrix(nrow = length(R_wts), ncol = length(mus))
+
+  
+#additive model
+for(j in 1:length(mus)){
+  mu = mus[j] #set mutation rate
+  for(i in 1:length(R_wts)){
+    R_wt = R_wts[i] #set WT R0
+    #fitness valley - R0 of intermediate variant
+    R_intermediates = c(R_wt*0.5) #fitness is 0.7 of the WT
+    # solve for emegence probability and add to probs.emergene matrix
+    probs.emergence[i,j] = pEmergence_landscape(n = n, mu = mu, R_wt = R_wt, R_adapted = R_adapted, R_intermediates = R_intermediates) # loaded from Nature_2003_functions.R
+  }
+}
+
+### prepare probs.emergence for plotting
+# format wide df
+  probs.emergence = cbind(R_wts, probs.emergence) %>% as.data.frame() #add R01_s column and format as df
+  colnames(probs.emergence) = c("R0", as.character(mus)) # add mu names to columns
+  
+# pivot to longform and save to list
+  probs.emergence.list[[3]] = probs.emergence %>% # columns R0, mu, and Prob.emergence give Prob emergence for each combination of R_wt and mu
+   pivot_longer(cols = !R0,
+    names_to = "mu",
+    values_to = "Prob.Emergence")
+
+
+  
+######################## Plotting ###############################
+#plot
+plot = ggplot() + 
+  geom_line(data = probs.emergence.list[[1]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "jackpot")) + #jackpot model
+  geom_line(data = probs.emergence.list[[2]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "additive")) + #additive model
+  geom_line(data = probs.emergence.list[[3]], aes(x = R0, y = Prob.Emergence, group = mu, col = mu, linetype = "valley")) + #valley model
+  theme_bw() + #sets background color to white and grey gridlines
+  labs(title = "fig 3b", x = "R0 of introduced pathogen", y = "Probability of emergence", col = "mu", linetype = "landscape") + #axis labels
+  scale_y_continuous(trans = "log10", limits = c(10^-7, 1)) +
+  scale_linetype_manual(values = c("valley" = "dotted", "additive" = "dashed", "jackpot" = "solid")) +
+  scale_color_manual(values = c("0.1" = "black", "0.001" = "forestgreen"))
+```
+
+
+```{r showplot}
+print(plot)
+
+```
+
+
+
+# Next steps
+
+As the $R_0$ of the initial spillover infection approaches 1, the emergence probability sharply increases. This effect is particularly evident for pathogens with low mutation rates (fig \ref{fig-2a}). This make sense - the higher the $R_0$, the more secondary cases are expected of a single infection, increasing the overall number of opportunities the pathogen has to stumble upon a mutation that increases transmissibility; at low mutation rates, this increase in opportunities is critical, as stumbling upon the right mutation takes more infections.
+
+A particularly interesting result is the effect of fitness landscapes on the probability of emergence. The additive model assumes that at any given starting $R_0$, the pathogen must aquire the same number of mutations to emerge.
+
+
+
+
+
+
+
+
+
+# References
