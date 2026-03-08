@@ -51,8 +51,8 @@ plot = ggplot() +
   theme_bw()
 
 #save 
-file = here("results", "data analysis", "congo", "fig_Smallpox_immunity_decay.png")
-ggsave(filename = file, plot = plot)
+#file = here("results", "data analysis", "congo", "fig_Smallpox_immunity_decay.png")
+#ggsave(filename = file, plot = plot)
 ```
 
 # Increase in effective reproductive number of Mpox
@@ -99,8 +99,8 @@ plot = ggplot() +
   theme_bw()
 
 #save 
-file = here("results", "data analysis", "congo", "fig_increase_Mpox_relative_R.png")
-ggsave(filename = file, plot = plot)
+#file = here("results", "data analysis", "congo", "fig_increase_Mpox_relative_R.png")
+#ggsave(filename = file, plot = plot)
 ```
 
 and finally, we can plot our estimate $R_e$ given different potential basic reproductive numbers of mpox: 
@@ -122,6 +122,6 @@ plot = do.call(grid.arrange, lapply(R0s, FUN = function(R0){
 }))
 
 #save 
-file = here("results", "data analysis", "congo", "fig_increase_Mpox_effective_R.png")
-ggsave(filename = file, plot = plot)
+#file = here("results", "data analysis", "congo", "fig_increase_Mpox_effective_R.png")
+#ggsave(filename = file, plot = plot)
 ```

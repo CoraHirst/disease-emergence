@@ -13,7 +13,8 @@ library(gridExtra) #for arrangeing plotsx
 library(RColorBrewer) #for colors
 library(gridExtra) #for plotting multiple plots in one figure
 
-source(here("code", "functions", "analysis_functions.R")) #for current version of adaptive mutation function
+#load source code
+source(here("code", "functions", "analysis_functions.R")) #for formatting multiple excel sheets
 
 # colors for plotting
 num_cols = 101
@@ -157,93 +158,7 @@ write.csv(deaths, file = here("data", "congo", "formatted data", "death_rates.cs
 write.csv(init_pop, file = here("data", "congo", "formatted data","pop_1980.csv"))
 ```
 
-Setting up leslie matrix: 
 
-```{r matrix-model-setup}
-#initialize leslie matrix with parameters from 1980
-L = diag(x = 1 - deaths[1, 1:100]) #firts year survivorship 1-death rate on diagonal
-L = rbind(births[1, 1:100], L) #add first year fecundities to top row
-L = cbind(L, c(births[1,101], rep(0,99), 1-deaths[1,101])) # add column ensures last row includes final death rate 
-tail(L) #looks good!
-
-# matrix to store population densities by age each year. rows will be age, columns will be year. 
-m = matrix(nrow = length(init_pop), ncol = 2023-1979) #44 columns for 44 years
-m[,1] = init_pop #initialize first column with populations structure in 1980
-
-#how many generations/years to run matrix? 
-years = 2023-1980
-
-```
-
-```{r simulate}
-#simulate population structure since 1980
-for(year in 1:years){
-  m[,year+1] = L %*% m[,year] #update population distribution
-  
-  #adjust leslie matrix with parameters from year
-  L = diag(x = 1 - deaths[year+1, 1:100]) #firts year survivorship 1-death rate on diagonal
-  L = rbind(births[year+1, 1:100], L) #add first year fecundities to top row
-  L = cbind(L, c(births[year+1,101], rep(0,99), 1-deaths[year+1,101])) # add column ensures last row includes final survivorship
-  
-}
-
-```
-
-```{r plot-total}
-population_size = apply(m, 2, sum)
-plot(x = 0:years, y = population_size)
-```
-
-Looks good!
-
-```{r }
-#formatting population matrix as age dataframe
-sim_pop = cbind(1980:2023, t(m)) %>% as.data.frame() 
-colnames(sim_pop) = c("Year", as.character(0:100))
-
-
-# extracting population size through time and formatting in long-form
-sim_population = sim_pop %>% 
-  pivot_longer( #longform for easier manipulation 
-    cols = !Year,
-    names_to = "Age", 
-    values_to = "Size"
-    ) %>% 
-  as.data.frame() # make data frame, not tibble
-
-summary(sim_population) #see variable types and information
-
-# mutate age feature to numeric
-sim_population = sim_population %>% mutate("Age" = as.numeric(Age))
-```
-
-```{r}
-# adding new feature to population dataframe - vacced
-# binary, true if older than age-1980 and thus had received vaccine or natural infection; false if younger and not immune.
-# indicated whether immune
-sim_population = sim_population %>%
-  mutate("Vacced" = case_when(Age >= Year - 1980 ~ TRUE, .default = FALSE))
-
-# sum number category for all vacced within each year
-sim_vacc_frac = sim_population %>%
-  group_by(Year) %>% #perform functions within groups
-  filter(Vacced == T) %>% #filter for only vaccinated ages
-  summarise(num_immune = sum(Size)) #sum across all ages 
-
-#add total population size each year to data frame
-sim_vacc_frac$total = sim_population %>%
-  group_by(Year) %>%
-  summarise(total = sum(Size)) %>%
-  pull("total")
-
-#calculate fraction immune
-sim_vacc_frac = sim_vacc_frac %>%
-  mutate("prop_immune" = num_immune/total) #yahoo
-
-```
-
-
-Simulated fraction immune in red, actual reported fraction in black. Cool!
 # Age structure in 1980, 2000, and 2023
 
 ```{r age-structure-plots}
@@ -283,93 +198,4 @@ grid.arrange(p_1980, p_2000, p_2023, nrow = 3)
 ```
 
 From the age structure, it looks like the Congo has maintained rapid growth from 1980 - present, suggesting that the population has maintained high fecundity. 
-
-Probably not good considering that the density of people is increasing and making it more likely that disease can be maintained in the population. 
-
-
-Two ways: 
-- first, model decay forward using 2023 birth/death rates
-- second, model decay forward using projected birth/death rates from trends in both 
-
-Finally, we will need to account for the effect of increasing population density on the success of transmission. Let's consider this moving forward. 
-
-
-To do: 
-
-1) Projectsions: 
-  a) lets give the matrix model and the true data model their own scripts
-  b) lets extrapolate from an exponential waning model with the true data
-  c) lets extrapolate the birth and death rates from the true data
-  d) if we want we can plot population structure in 1980 and 2023 and make an inference on future structure from that? DONE
-
-
-Sojourn:
-
-```{r formatting-population-dataframe}
-# extracting population size through time from congo_demographics list and formatting in long-form
-population = congo_demographics$population %>% 
-  pivot_longer( #longform for easier manipulation 
-    cols = !Year,
-    names_to = "Age", 
-    values_to = "Size"
-    ) %>% 
-  as.data.frame() # make data frame, not tibble
-
-summary(population) #see variable types and information
-
-# mutate age feature to numeric
-population = population %>% mutate("Age" = as.numeric(Age))
-
-```
-
-```{r reported-vaccinated-through-time}
-# adding new feature to population dataframe - vacced
-# binary, true if older than age-1980 and thus had received vaccine or natural infection; false if younger and not immune.
-# indicated whether immune
-population = population %>%
-  mutate("Vacced" = case_when(Age >= Year - 1980 ~ TRUE, .default = FALSE))
-
-# sum number category for all vacced within each year
-vacc_frac = population %>%
-  group_by(Year) %>% #perform functions within groups
-  filter(Vacced == T) %>% #filter for only vaccinated ages
-  summarise(num_immune = sum(Size)) #sum across all ages 
-
-#add total population size each year to data frame
-vacc_frac$total = population %>%
-  group_by(Year) %>%
-  summarise(total = sum(Size)) %>%
-  pull("total")
-
-#calculate fraction immune
-vacc_frac = vacc_frac %>%
-  mutate("prop_immune" = num_immune/total) #yahoo
-```
-
-```{r plot-declining-immunity}
-ggplot(data = vacc_frac) + 
-  geom_point(aes(x = Year, y = log10(prop_immune))) + geom_line(aes(x = Year, y = log10(prop_immune))) + 
-  labs(x = "Year", y = "log10 Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023") +
-  theme_bw()  
-
-```
-
-Looks more or less like an exponential drop in immunity, though with slightly great decay (greater concavity). 
-
-Lets see if we can recreate this behavior with the leslie matrix model. 
-
-```{r plot-declining-immunity-sim}
-ggplot() + 
-  geom_point(data = sim_vacc_frac, aes(x = Year, y = log10(prop_immune)), col = "red") + geom_line(data = sim_vacc_frac, aes(x = Year, y = log10(prop_immune)), col = "red") + 
-  geom_point(data = vacc_frac, aes(x = Year, y = log10(prop_immune))) + geom_line(data = vacc_frac, aes(x = Year, y = log10(prop_immune))) +
-  labs(x = "Year", y = "log10 Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023") +
-  theme_bw()  
-
-ggplot() + 
-  geom_point(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "red") + geom_line(data = sim_vacc_frac, aes(x = Year, y = (prop_immune)), col = "red") + 
-  geom_point(data = vacc_frac, aes(x = Year, y = (prop_immune))) + geom_line(data = vacc_frac, aes(x = Year, y = (prop_immune))) +
-  labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023") +
-  theme_bw()  
-
-```
 
