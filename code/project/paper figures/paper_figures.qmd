@@ -333,7 +333,7 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
   labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", col = expression(sigma)) +
   #aesthetics
   theme_bw() +
-  theme(axis.text=element_text(size=25),
+  theme(axis.text=element_text(size=25, colour = "black"),
         axis.title=element_text(size=24),
         legend.title = element_text(size = 25), # Legend title font size
         legend.text = element_text(size = 25)  # Legend key labels font size
@@ -375,19 +375,20 @@ pNE_multitype = pNE_multitype %>% pivot_longer(
 
 # plot
 plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
-  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)), alpha = factor(as.numeric(mu))), color = "#4DAF4AFF", linewidth = 1.5) +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)),  linetype = factor(as.numeric(mu))), color = "forestgreen", linewidth = 1.5) +
   #axes and titles
   scale_x_continuous(breaks = c(0.5,1,1.5)) +
   coord_cartesian(ylim = c(-6, 0)) +
-  scale_alpha_manual(values = c(0.2, 0.4, 0.6, 0.8, 1 ), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
-  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", alpha = expression(mu)) +
+  scale_linetype_manual(values = c("dotted","dotdash","twodash","dashed", "solid"), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", linetype = expression(mu)) +
   #aesthetics
   theme_bw() +
-  theme(axis.text=element_text(size=25),
+   guides(linetype = guide_legend(override.aes = list(linewidth = 1))) +
+  theme(axis.text=element_text(size=25, color = "black"),
         axis.title=element_text(size=25),
         legend.title = element_text(size = 25), # Legend title font size
-        legend.text = element_text(size = 25)  # Legend key labels font size
-        )  
+        legend.text = element_text(size = 25),  # Legend key labels font size
+        legend.key.width = unit(2.5, "lines"))  
 
 #print plot
 print(plot)
