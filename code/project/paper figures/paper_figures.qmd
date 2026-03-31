@@ -805,12 +805,12 @@ ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
 
 and if we want just a single plot with a few trajectories on it: 
 
-```{r Fig-4}
+```{r Fig-4a}
 ## choose S0 to plot
 S0.to.plot = 10^4 
 
 ## R0 range smaller so plot clearer
-R0_range = c(0.85, 0.95, 1.05)
+R0_range = c(0.85, 1.05)
 
 ## colors for plotting trajectories
       cols = brewer.pal(n = length(R0_range), name = "Greys")
@@ -824,14 +824,14 @@ trajectories.singleS0 = lapply(trajectories, function(trajectory) {
 trajectories.singleS0 = do.call(rbind, trajectories.singleS0) #combine list to single df for easier plotting
 
 ## Plot heatmap and contours
-plot = 
+plot1 = 
     ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) + #heatmap
       scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
       geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) 
 
 #add trajectories
 for(i in R0_range){
-plot = plot +
+plot1 = plot1 +
       geom_segment(data = trajectories.singleS0 %>% filter(R0 == i, Year %% 10 == 0), 
             aes(x = Re, y = log10(S), xend = c(tail(Re, n = -1),NA), yend = c(tail(log10(S), n = -1),NA), colour = factor(R0)), 
             arrow = arrow(length = unit(0.3,"cm")),
@@ -843,27 +843,27 @@ plot = plot +
             size = 8) 
     }
 # aesthetics    
-plot = plot +
+plot1 = plot1 +
       scale_color_manual(values = cols, labels = R0_range) +
       coord_cartesian(xlim = c(0.5, 1.05)) +
       labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log10 spillover rate ", year^-1)), fill = expression(paste("log10 ", P[p])), color = expression(R[0])) +
       #aesthetics
       scale_x_continuous(breaks = c(0.1, 0.5, 1.0)) +
       theme_classic() +
-      theme(axis.text=element_text(size=35),
-            axis.title=element_text(size=35),
-            legend.title = element_text(size = 30), # Legend title font size
-            legend.text = element_text(size = 26)  # Legend key labels font size
+      theme(axis.text=element_text(size=30),
+            axis.title=element_text(size=30),
+            legend.title = element_text(size = 18), # Legend title font size
+            legend.text = element_text(size = 16)  # Legend key labels font size
             )    
 #print plot
-print(plot)
+print(plot1)
 
 # save
 file = here("results", "paper figs", "fig_single_trajectories.jpg")
-ggsave(filename = file, plot = plot)
+ggsave(filename = file, plot = plot1)
 ```
 
-```{r figure-4b}
+```{r Fig-4b}
 ## choose S0 to plot
 S0.to.plot = 10^4 
 
@@ -884,10 +884,10 @@ trajectories.solved = trajectories.solved %>%
   mutate("P" = total_P(p = p, S = S, years =1))
 
 #plot trajectories
-plot = ggplot()
+plot2 = ggplot()
 
 for(i in R0_range){
-plot = plot + geom_segment(data = trajectories.solved %>% filter(R0 == i), 
+plot2 = plot2 + geom_segment(data = trajectories.solved %>% filter(R0 == i), 
                                aes(x = Year, y = log10(P), xend = c(tail(Year, n = -1),NA), yend = c(tail(log10(P), n = -1),NA), colour = factor(R0)), 
             arrow = arrow(length = unit(0.3,"cm")),
             linewidth = 1.25) 
@@ -895,18 +895,32 @@ plot = plot + geom_segment(data = trajectories.solved %>% filter(R0 == i),
 }
 
 # aesthetics
-plot = plot + theme_classic() +
+plot2 = plot2 + theme_classic() +
+   coord_cartesian(xlim = c(1980,2080)) +
    scale_color_manual(values = my.colors, labels = R0_range) + 
-   labs(x = "Year", y = expression(paste("log10 ", P[p])), color = "R0") +
-   theme(axis.text=element_text(size=35),
-            axis.title=element_text(size=35),
-            legend.title = element_text(size = 30), # Legend title font size
-            legend.text = element_text(size = 26)  # Legend key labels font size
+   labs(x = "Year", y = expression(paste("log10 ", P[p])), color = expression(R[0])) +
+   theme(axis.text=element_text(size=30),
+            axis.title=element_text(size=30),
+            legend.title = element_text(size = 18), # Legend title font size
+            legend.text = element_text(size = 16)  # Legend key labels font size
             )    
+#print to viewer
+print(plot2)
 
-print(plot)
+# save
+file = here("results", "paper figs", "fig_Pp_time.jpg")
+ggsave(plot2, file = file)
 ```
 
+```{r Fig-4}
+# remove legends
+plot1 = plot1 + theme(legend.position = "none")
+plot2 = plot2 + theme(legend.position = "none")
+
+file = here("results", "paper figs", "fig_trajectories_and_Pp.jpg")
+ggsave(plot = grid.arrange(plot1, plot2, ncol = 2), file = file)
+
+```
 
 # Pre-adaptation pandemic potential 
 
