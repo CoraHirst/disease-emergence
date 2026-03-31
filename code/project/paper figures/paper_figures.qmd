@@ -333,7 +333,7 @@ plot = ggplot() + #plotting the results for less than 1 with the results for gre
   labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", col = expression(sigma)) +
   #aesthetics
   theme_bw() +
-  theme(axis.text=element_text(size=25, colour = "black"),
+  theme(axis.text=element_text(size=25),
         axis.title=element_text(size=24),
         legend.title = element_text(size = 25), # Legend title font size
         legend.text = element_text(size = 25)  # Legend key labels font size
@@ -375,20 +375,19 @@ pNE_multitype = pNE_multitype %>% pivot_longer(
 
 # plot
 plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
-  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)),  linetype = factor(as.numeric(mu))), color = "forestgreen", linewidth = 1.5) +
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)), alpha = factor(as.numeric(mu))), color = "#4DAF4AFF", linewidth = 1.5) +
   #axes and titles
   scale_x_continuous(breaks = c(0.5,1,1.5)) +
   coord_cartesian(ylim = c(-6, 0)) +
-  scale_linetype_manual(values = c("dotted","dotdash","twodash","dashed", "solid"), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
-  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", linetype = expression(mu)) +
+  scale_alpha_manual(values = c(0.2, 0.4, 0.6, 0.8, 1 ), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", alpha = expression(mu)) +
   #aesthetics
   theme_bw() +
-   guides(linetype = guide_legend(override.aes = list(linewidth = 1))) +
-  theme(axis.text=element_text(size=25, color = "black"),
+  theme(axis.text=element_text(size=25),
         axis.title=element_text(size=25),
         legend.title = element_text(size = 25), # Legend title font size
-        legend.text = element_text(size = 25),  # Legend key labels font size
-        legend.key.width = unit(2.5, "lines"))  
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )  
 
 #print plot
 print(plot)
@@ -863,6 +862,51 @@ print(plot)
 file = here("results", "paper figs", "fig_single_trajectories.jpg")
 ggsave(filename = file, plot = plot)
 ```
+
+```{r figure-4b}
+## choose S0 to plot
+S0.to.plot = 10^4 
+
+## R0 range smaller so plot clearer
+R0_range = c(0.85, 0.95, 1.05)
+
+## create dataframe of trajectories for different R0 and a single S0
+trajectories.singleS0 = lapply(trajectories, function(trajectory) {
+  trajectory = trajectory %>% filter(S0 == S0.to.plot)
+  return(trajectory)
+} )
+trajectories.singleS0 = do.call(rbind, trajectories.singleS0) #combine list to single df for easier plotting
+
+## creating df for plotting 
+trajectories.solved = trajectories.singleS0 %>% filter(R0 %in% R0_range, Year %% 10 == 0) #we only want to plot every 10 years
+trajectories.solved$p = sapply(trajectories.solved$Re, function(R_spill) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = mu, R_wt = R_spill, R_adapted = R_adapted)}) #calculate p(emerge|spill)
+trajectories.solved = trajectories.solved %>%
+  mutate("P" = total_P(p = p, S = S, years =1))
+
+#plot trajectories
+plot = ggplot()
+
+for(i in R0_range){
+plot = plot + geom_segment(data = trajectories.solved %>% filter(R0 == i), 
+                               aes(x = Year, y = log10(P), xend = c(tail(Year, n = -1),NA), yend = c(tail(log10(P), n = -1),NA), colour = factor(R0)), 
+            arrow = arrow(length = unit(0.3,"cm")),
+            linewidth = 1.25) 
+  print(i)
+}
+
+# aesthetics
+plot = plot + theme_classic() +
+   scale_color_manual(values = my.colors, labels = R0_range) + 
+   labs(x = "Year", y = expression(paste("log10 ", P[p])), color = "R0") +
+   theme(axis.text=element_text(size=35),
+            axis.title=element_text(size=35),
+            legend.title = element_text(size = 30), # Legend title font size
+            legend.text = element_text(size = 26)  # Legend key labels font size
+            )    
+
+print(plot)
+```
+
 
 # Pre-adaptation pandemic potential 
 
