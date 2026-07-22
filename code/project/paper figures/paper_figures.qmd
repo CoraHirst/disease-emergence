@@ -122,16 +122,16 @@ We plot the loss of smallpox immunity on the left axis and related increase in r
 #plotting altogether
 plot = ggplot() + 
   #plotting relative effective R
-  geom_line(data = relative.effective.R %>% filter(Year <= 2024), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2) +
-  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2, alpha = 0.5) +
+  geom_line(data = relative.effective.R %>% filter(Year <= 2024), aes(x = Year-1980, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year-1980, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2, alpha = 0.5) +
   #plotting proportion immune
-  geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
-  geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
-  geom_vline(xintercept = 2023, linetype = "dashed", linewidth = 2) +
+  geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year-1980, y = (prop_immune)), col = "black", linewidth = 2) +
+  geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year-1980, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
+  #geom_vline(xintercept = 2023-1980, linetype = "dashed", linewidth = 2) +
   #adding labels
   scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative effective R ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
-  scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)) +
-  labs(x = "Year", color = "Cross immunity") +
+  scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)-1980) +
+  labs(x = "Years post eradication", color = "Cross immunity") +
   # plot aesthetics
   theme_bw() + 
   theme(axis.text = element_text(size = 25),
@@ -828,7 +828,7 @@ trajectories.singleS0 = do.call(rbind, trajectories.singleS0) #combine list to s
 plot = 
     ggplot() + geom_tile(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), fill = log10(P))) + #heatmap
       scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
-      geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3,-1), col = 'black', linewidth = 1.5) 
+      geom_contour(data = Ps_long, aes(x = Rspill, y = log10(as.numeric(S)), z = log10(P)), breaks = c(-3), col = 'black', linewidth = 1.5) 
 
 #add trajectories
 for(i in R0_range){
@@ -847,7 +847,7 @@ plot = plot +
 plot = plot +
       scale_color_manual(values = cols, labels = R0_range) +
       coord_cartesian(xlim = c(0.5, 1.05)) +
-      labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log10 spillover rate ", year^-1)), fill = expression(paste("log10 ", P[p])), color = expression(R[0])) +
+      labs(x = expression(paste(R[e], " of introduced pathogen")), y = expression(paste("Log"[10], " spillover rate ", year^-1)), fill = expression(paste("log"[10], P[p])), color = expression(R[0])) +
       #aesthetics
       scale_x_continuous(breaks = c(0.5, 0.75, 1.0)) +
       theme_classic() +
