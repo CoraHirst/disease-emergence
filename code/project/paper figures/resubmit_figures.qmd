@@ -1,0 +1,310 @@
+---
+title: "resubmit_figures"
+format: html
+---
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+library(ggstance)
+library(scales)
+
+# colors for plotting
+num_cols = 20
+my.colors = brewer.pal(n = 8, name = "Set1")
+my.colors.many = colorRampPalette(my.colors)(num_cols)
+```
+
+```{r define-additive-model}
+#### additive model
+pEmergence_additive = function(m, mu, R0_1, R0_2, Rfinal){ #m is number of types, mu is mutation rate, R0_1 is wt R0, Ro_2 is adapted type R0, xstart is a vector of initial guesses for fixed point equations (length(m)), and init is initial number of cases of each type
+  ## parms 
+  R0_1 = R0_1 #R0_1 of initial wildtype
+  R0_2 = R0_2 #final adapted type R0_2
+  mu = mu #mutation rate (same for each type)
+  m = m #number of types here, number of intermediates in paper
+  Rstep = (R0_2-R0_1)/(m-1) # increase in R0 with each step
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[1] = 1 #except for 1 case of the starting type
+  
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[1] = 1 #except for the prob of a linneage started by our 1 starting case type
+  
+  # function for prob.emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  
+  ## solve system of equations
+  # define system of nl equations
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0_1+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R0_1+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
+    }
+    y[m] = exp(-Rfinal*(1-x[m])) - x[m]
+    y
+  }
+  
+  
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+  return(prob.emergence)
+}
+```
+
+```{r define-paper-model}
+pEmergence_fixed = function(m, mu, R0_1, R0_2, Rfinal) {
+  ### calculate step size and breaks
+  Rstep = R0_2/(m-1) #increase in R0 with each mutation
+  breaks = Rstep*(1:(m)) #intervals describing the range of R0 for types (variants) with increasing number of mutations
+  
+  ### define R0 vector 
+  ## determine into which interval the wtR0 falls
+  diffs = breaks - R0_1 #distance from wtR0 to each interval break
+  type = which(diffs == min(diffs[which(diffs >= 0)]))[1] # position of the least positive distance gives the interval - type - into which the wtR0 falls
+  
+  ## calculate change in R0 from wt to each other variant
+  delta_R0 = Rstep*c(-(type-1):0, 1:(m-type)) #vector of changes from wtR0 to the R0 of each other variant
+  R0 = R0_1 + delta_R0 # add the changes from wtR0 to wtR0 to give R0 of each variant
+  R0[m] = Rfinal #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  
+  ### define probability of emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting linneage
+  
+  ### define fixed point equations from PGFs
+  ## system of nl equations to solve
+  multi_mut <- function(x) {
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i]
+    }
+    y[m] = exp(-R0[m]*(1-x[m])) - x[m]
+    y
+  }
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[type] = 1 #except for 1 case of the starting type
+  
+  ### define initial guess for fixed point vector
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[type] = 1 #except for the prob of a linneage started by our 1 starting case type
+  
+  ### solve for fixed points
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init)
+  
+  return(prob.emergence) 
+}
+
+```
+
+
+Below we plot both
+
+```{r solve-additive}
+## parameters
+R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+ms = c(2, 3, 4, 5, 6)
+
+mu = 10^-2 #mutation rate
+
+## matrix to store emergence probabilities 
+probs.emergence.additive = matrix(nrow = length(R_wts), ncol = length(ms)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(ms)){
+  for(i in 1:length(R_wts)){
+    probs.emergence.additive[i,j] = pEmergence_additive(m = ms[j], mu = mu, R0_1 = R_wts[i], R0_2 = 1, Rfinal = R_adapted) #run simulation for each delta_R,R_wt combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence.additive = cbind(R_wts, probs.emergence.additive) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.additive) = c("R0", ms-1) #name the columns for easy referencing
+probs.emergence.additive = probs.emergence.additive %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "m", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+# plot
+plot2 = ggplot() + 
+          geom_line(data = probs.emergence.additive, aes(x = R0, y = log10(P.Emergence), group = m, col = m), linewidth = 2) + #plot p emergence as function of R_wt for each m
+          theme_bw() + #white background with grey gridlines
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with m additive intermediates", col = expression(m)) + #axis and title labels
+          scale_x_continuous(breaks = seq(0.2, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.2, 1)) +
+          scale_color_manual(values = my.colors, breaks = ms-1) + #because pretty
+  # aesthetics
+          theme_bw() + 
+          theme(axis.text = element_text(size = 25),
+                axis.title = element_text(size = 25),
+                legend.title = element_text(size = 25),
+                legend.text = element_text(size = 25))
+# print plot
+print(plot2)
+```
+
+
+```{r solve-fixed}
+## parameters
+R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+ms = c(6, 7, 8, 11, 13, 16)
+
+mu = 10^-2 #mutation rate
+
+## matrix to store emergence probabilities 
+probs.emergence.fixed = matrix(nrow = length(R_wts), ncol = length(ms)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(ms)){
+  for(i in 1:length(R_wts)){
+    probs.emergence.fixed[i,j] = pEmergence_fixed(m = ms[j], mu = mu, R0_1 = R_wts[i], R0_2 = 1+10^-5 , Rfinal = R_adapted) #run simulation for each delta_R,R_wt combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence.fixed = cbind(R_wts, probs.emergence.fixed) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.fixed) = c("R0", ms-1) #name the columns for easy referencing
+probs.emergence.fixed = probs.emergence.fixed %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "m", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+# plot
+plot = ggplot() + 
+          geom_line(data = probs.emergence.fixed, aes(x = R0, y = log10(P.Emergence), group = m, col = m), linewidth = 2) + #plot p emergence as function of R_wt for each m
+          theme_bw() + #white background with grey gridlines
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with m", col = expression(m)) + #axis and title labels
+          scale_x_continuous(breaks = seq(0.2, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.2, 1)) +
+          scale_color_manual(values = my.colors, breaks = ms-1) + #because pretty
+  # aesthetics
+          theme_bw() + 
+          theme(axis.text = element_text(size = 25),
+                axis.title = element_text(size = 25),
+                legend.title = element_text(size = 25),
+                legend.text = element_text(size = 25))
+# print plot
+print(plot)
+```
+
+
+plot together
+
+```{r plot-fixed-additive}
+plot3 = plot2 + geom_line(data = probs.emergence.fixed %>% filter(m == "5"), aes(x = R0, y = log10(P.Emergence), group = m),linetype = "solid", linewidth = 2)  #plot p emergence as function of R_wt for each m
+
+print(plot3)
+```
+
+maybe we try it with the sigma? 
+
+```{r define-sigma}
+######## evenly dispersed distribution described by generating functions for secondary cases
+pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
+  ### calculate number of variants
+  m = ceiling(abs(log10(R_wt + 10^-8))/log10(1+delta_R)) +1  #number of types in the branching process #note that we need a slight overshoot of R0 = 1 to get supercritical
+  
+  ### define R0 vector 
+  R0 = R_wt*(1+delta_R)^(0:(m-1))  # add the changes from wtR0 to give R0 of each variant
+  R0[m] = R_adapted #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  
+  ### define probability of emergence
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting lineage
+  
+  ### define fixed point equations from PGFs
+  ## system of nl equations to solve
+  multi_mut <- function(x) { # for poisson dist. the mean is R_0 and the generating function is exp(R0(s -1))
+    y <- numeric(m)
+    for(i in 1:(m-1)){
+      y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i] # fixed point from probability generating function 
+    }
+    y[m] = exp(-R0[m]*(1-x[m])) - x[m] # can only make type m, regardless of mutation. 
+    y
+  }
+  
+  ### define initial conditions
+  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init[1] = 1 #except for 1 case of the starting type
+  
+  ### define initial guess for fixed point vector
+  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart[1] = 1 #except for the prob of a linneage started by our 1 starting case type 1
+  
+  ### solve for fixed points
+  # newton start
+  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #solve system of nonlinear equations for fixed point
+  
+  # solve for prob.emergence
+  prob.emergence = prob_emergence(qs = qs, init = init) #solve for 1-sum(q_i^init(i)) - should be q_1^1 for a single starting case of type 1 
+  
+  return(prob.emergence) 
+}
+```
+
+```{r solve-sigma}
+## parameters
+R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
+R_adapted = 1000 #R0 of final phenotype
+delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
+mu = 10^-3 #mutation rate
+
+## matrix to store emergence probabilities 
+probs.emergence.deltaR = matrix(nrow = length(R_wts), ncol = length(delta_Rs)) # vector to store probabilities of emergence
+
+## simulate
+for(j in 1:length(delta_Rs)){
+  for(i in 1:length(R_wts)){
+    probs.emergence.deltaR[i,j] = pEmergence_deltaR(delta_R = delta_Rs[j], mu = mu, R_wt = R_wts[i], R_adapted = R_adapted) #run simulation for each delta_R,R_wt combination
+  }
+}
+
+## format matrix for plotting
+probs.emergence.deltaR = cbind(R_wts, probs.emergence.deltaR) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
+colnames(probs.emergence.deltaR) = c("R0", as.character(round(delta_Rs, digits = 2))) #name the columns for easy referencing
+probs.emergence.deltaR = probs.emergence.deltaR %>% #pivot to long-form
+  pivot_longer(cols = !R0, #keep R_wt column
+               names_to = "delta_R", #add feature denoting "m" used row-wise
+               values_to = "P.Emergence") #add feature denoting the pemergence calculated from m in m column and R_wt in R_wt column
+
+# plot
+plot = ggplot() + 
+          geom_line(data = probs.emergence.deltaR, aes(x = R0, y = log10(P.Emergence), group = delta_R, col = delta_R), linewidth = 2) + #plot p emergence as function of R_wt for each m
+          theme_bw() + #white background with grey gridlines
+          labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with delta R", col = expression(sigma)) + #axis and title labels
+          scale_x_continuous(breaks = seq(0.5, 1, by = 0.1)) +
+          coord_cartesian(ylim = c(-8,0), xlim = c(0.6, 1)) +
+          scale_color_manual(values = my.colors, breaks = as.character(round(delta_Rs, digits = 2))) + #because pretty
+  # aesthetics
+          theme_bw() + 
+          theme(axis.text = element_text(size = 25),
+                axis.title = element_text(size = 25),
+                legend.title = element_text(size = 25),
+                legend.text = element_text(size = 25))
+# print plot
+print(plot)
+
+```
+
+
+```{r plot-sigma-additive}
+plot4 = plot2 + geom_line(data = probs.emergence.deltaR %>% filter(delta_R == "0.25"), aes(x = R0, y = log10(P.Emergence), group = delta_R),linetype = "solid", linewidth = 2)  #plot p emergence as function of R_wt for each m
+
+print(plot4)
+```
+
+it doesn't change much in terms of fit...

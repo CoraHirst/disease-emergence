@@ -75,42 +75,6 @@ pEmergence_jackpot = function(n, mu, R_wt, R_adapted){ #n is number of intermedi
   return(prob.emergence)
 }
 
-#### additive model
-pEmergence_additive = function(n, mu, R_wt, R_adapted){ #m is number of types, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
-  
-  # parms 
-  R_wt = R_wt #R_wt of initial wildtype
-  R_adapted = R_adapted #final adapted type R0_m
-  mu = mu #mutation rate (same for each type)
-  m = n+2 #number of types here, number of intermediates in paper
-  Rstep = (1-R_wt)/(m-1) # increase in R0 with each step
-  
-  # initial conditions
-  init = c(1, rep(0, m-1)) #vector initial numbers of infections of each type, length(m); start with only 1 infection of wildtype, type 1
-  xstart = c(1, rep(0, m-1)) #vector of initial guesses (between 0 and 1) for fixed point solution, (length(m))
-  
-  # function for prob.emergence
-  prob_emergence = function(qs,init) {1 - prod(qs^init)}
-  
-  ## solve system of equations
-  # define system of nl equations
-  multi_mut <- function(x) {
-    y <- numeric(m)
-    for(i in 1:(m-1)){
-      y[i] = exp(-(1-mu)*(R_wt+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R_wt+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
-    }
-    y[m] = exp(-R_adapted*(1-x[m])) - x[m]
-    y
-  }
-  
-  # newton start
-  qs = nleqslv(xstart, multi_mut, method="Newton", global="none", control=list(trace=1,stepmax=2))$x #extinction probabilities
-  
-  # solve for prob.emergence
-  prob.emergence = prob_emergence(qs = qs, init = init) #calculate emergence prob from extinction prob
-  
-  return(prob.emergence)
-}
 
 #### additive model
 pEmergence_additive = function(n, mu, R_wt, R_adapted){ #m is number of types, mu is mutation rate, R_wt is wt R0, R_adapted is adapted type R0
