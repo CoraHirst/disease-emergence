@@ -26,27 +26,27 @@ pEmergence_additive = function(m, mu, R0_1, R0_2, Rfinal){ #m is number of types
   R0_1 = R0_1 #R0_1 of initial wildtype
   R0_2 = R0_2 #final adapted type R0_2
   mu = mu #mutation rate (same for each type)
-  m = m #number of types here, number of intermediates in paper
-  Rstep = (R0_2-R0_1)/(m-1) # increase in R0 with each step
+  ntypes = m+1 #number of types here, number of intermediates in paper
+  Rstep = (R0_2-R0_1)/(m) # increase in R0 with each step
   
   ### define initial conditions
-  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init = rep(0, ntypes) #start the initial number of cases of each type to 0 
   init[1] = 1 #except for 1 case of the starting type
   
-  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart = rep(0,ntypes) #easiest to set all probs to 0 and work upwards to find the smallest nonnegative roots
   xstart[1] = 1 #except for the prob of a linneage started by our 1 starting case type
   
   # function for prob.emergence
-  prob_emergence = function(qs,init) {1 - prod(qs^init)}
+  prob_emergence = function(qs,init) {1 - prod(qs^init)} # will simplify to 1-qs[1] because we only start with 1 infection of the first type
   
   ## solve system of equations
   # define system of nl equations
   multi_mut <- function(x) {
-    y <- numeric(m)
-    for(i in 1:(m-1)){
+    y <- numeric(ntypes)
+    for(i in 1:(m)){
       y[i] = exp(-(1-mu)*(R0_1+(Rstep*(i-1)))*(1-x[i]))*exp(-mu*(R0_1+(Rstep*(i-1)))*(1-x[i+1])) - x[i]
     }
-    y[m] = exp(-Rfinal*(1-x[m])) - x[m]
+    y[ntypes] = exp(-Rfinal*(1-x[ntypes])) - x[ntypes]
     y
   }
   
@@ -115,9 +115,9 @@ Below we plot both
 
 ```{r solve-additive}
 ## parameters
-R_wts = seq(0, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0, 1, by = 0.001) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
-ms = c(2, 3, 4, 5, 6)
+ms = c(1, 2, 3, 4, 5)
 
 mu = 10^-2 #mutation rate
 
@@ -133,7 +133,7 @@ for(j in 1:length(ms)){
 
 ## format matrix for plotting
 probs.emergence.additive = cbind(R_wts, probs.emergence.additive) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
-colnames(probs.emergence.additive) = c("R0", ms-1) #name the columns for easy referencing
+colnames(probs.emergence.additive) = c("R0", ms) #name the columns for easy referencing
 probs.emergence.additive = probs.emergence.additive %>% #pivot to long-form
   pivot_longer(cols = !R0, #keep R_wt column
                names_to = "m", #add feature denoting "m" used row-wise
@@ -146,7 +146,7 @@ plot2 = ggplot() +
           labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with m additive intermediates", col = expression(m)) + #axis and title labels
           scale_x_continuous(breaks = seq(0.2, 1, by = 0.1)) +
           coord_cartesian(ylim = c(-8,0), xlim = c(0.2, 1)) +
-          scale_color_manual(values = my.colors, breaks = ms-1) + #because pretty
+          scale_color_manual(values = my.colors, breaks = ms) + #because pretty
   # aesthetics
           theme_bw() + 
           theme(axis.text = element_text(size = 25),
@@ -209,6 +209,10 @@ plot together
 plot3 = plot2 + geom_line(data = probs.emergence.fixed %>% filter(m == "5"), aes(x = R0, y = log10(P.Emergence), group = m),linetype = "solid", linewidth = 2)  #plot p emergence as function of R_wt for each m
 
 print(plot3)
+
+# save
+file = here("results", "paper figs", "fig_model_intuition_fixed.jpg")
+ggsave(filename = file, plot = plot3)
 ```
 
 maybe we try it with the sigma? 
@@ -258,10 +262,10 @@ pEmergence_deltaR = function(delta_R, mu, R_wt, R_adapted) {
 
 ```{r solve-sigma}
 ## parameters
-R_wts = seq(0.01, 1, by = 0.01) #wt R0s to test
+R_wts = seq(0.6, 1, by = 0.001) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
 delta_Rs = c(.02,.05,.1,.25, 1) #how many types? m-1 mutations required, meaning m-2 intermediate types
-mu = 10^-3 #mutation rate
+mu = 10^-2 #mutation rate
 
 ## matrix to store emergence probabilities 
 probs.emergence.deltaR = matrix(nrow = length(R_wts), ncol = length(delta_Rs)) # vector to store probabilities of emergence
@@ -302,9 +306,15 @@ print(plot)
 
 
 ```{r plot-sigma-additive}
-plot4 = plot2 + geom_line(data = probs.emergence.deltaR %>% filter(delta_R == "0.25"), aes(x = R0, y = log10(P.Emergence), group = delta_R),linetype = "solid", linewidth = 2)  #plot p emergence as function of R_wt for each m
-
+plot4 = plot2 + 
+  geom_line(data = probs.emergence.deltaR %>% filter(delta_R == "0.1"), aes(x = R0, y = log10(P.Emergence), group = delta_R),linetype = "solid", linewidth = 2) + #plot p emergence as function of R_wt for each m
+  coord_cartesian(ylim = c(-8,0), xlim = c(0.6, 1))  
+#print to view
 print(plot4)
+
+# save
+file = here("results", "paper figs", "fig_model_intuition_sigma.jpg")
+ggsave(filename = file, plot = plot4)
 ```
 
-it doesn't change much in terms of fit...
+As expected, because we are so close to 1, the fixed step size and the % increase with mutations give rise to very similar curves. I will save the % increase with mutation 
