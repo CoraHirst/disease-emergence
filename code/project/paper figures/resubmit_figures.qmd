@@ -60,11 +60,12 @@ pEmergence_additive = function(m, mu, R0_1, R0_2, Rfinal){ #m is number of types
 }
 ```
 
-```{r define-paper-model}
+```{r define-fixed-model}
 pEmergence_fixed = function(m, mu, R0_1, R0_2, Rfinal) {
   ### calculate step size and breaks
-  Rstep = R0_2/(m-1) #increase in R0 with each mutation
-  breaks = Rstep*(1:(m)) #intervals describing the range of R0 for types (variants) with increasing number of mutations
+  ntypes = m+1
+  Rstep = R0_2/(m) #increase in R0 with each mutation
+  breaks = Rstep*(1:ntypes) #intervals describing the range of R0 for types (variants) with increasing number of mutations
   
   ### define R0 vector 
   ## determine into which interval the wtR0 falls
@@ -72,9 +73,9 @@ pEmergence_fixed = function(m, mu, R0_1, R0_2, Rfinal) {
   type = which(diffs == min(diffs[which(diffs >= 0)]))[1] # position of the least positive distance gives the interval - type - into which the wtR0 falls
   
   ## calculate change in R0 from wt to each other variant
-  delta_R0 = Rstep*c(-(type-1):0, 1:(m-type)) #vector of changes from wtR0 to the R0 of each other variant
+  delta_R0 = Rstep*c(-(type-1):0, 1:(ntypes-type)) #vector of changes from wtR0 to the R0 of each other variant
   R0 = R0_1 + delta_R0 # add the changes from wtR0 to wtR0 to give R0 of each variant
-  R0[m] = Rfinal #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
+  R0[ntypes] = Rfinal #final R0 >> 1 to account for differences in emergence probabilities arising from final R0
   
   ### define probability of emergence
   prob_emergence = function(qs,init) {1 - prod(qs^init)} # 1 - product of the probabilities of extinction for each starting linneage
@@ -82,20 +83,20 @@ pEmergence_fixed = function(m, mu, R0_1, R0_2, Rfinal) {
   ### define fixed point equations from PGFs
   ## system of nl equations to solve
   multi_mut <- function(x) {
-    y <- numeric(m)
-    for(i in 1:(m-1)){
+    y <- numeric(ntypes)
+    for(i in 1:(m)){
       y[i] = exp(-(1-mu)*(R0[i])*(1-x[i]))*exp(-mu*R0[i]*(1-x[i+1])) - x[i]
     }
-    y[m] = exp(-R0[m]*(1-x[m])) - x[m]
+    y[ntypes] = exp(-R0[ntypes]*(1-x[ntypes])) - x[ntypes]
     y
   }
   
   ### define initial conditions
-  init = rep(0, m) #start the initial number of cases of each type to 0 
+  init = rep(0, ntypes) #start the initial number of cases of each type to 0 
   init[type] = 1 #except for 1 case of the starting type
   
   ### define initial guess for fixed point vector
-  xstart = rep(0,m) #easiest to set all probs to 0
+  xstart = rep(0,ntypes) #easiest to set all probs to 0
   xstart[type] = 1 #except for the prob of a linneage started by our 1 starting case type
   
   ### solve for fixed points
@@ -141,7 +142,7 @@ probs.emergence.additive = probs.emergence.additive %>% #pivot to long-form
 
 # plot
 plot2 = ggplot() + 
-          geom_line(data = probs.emergence.additive, aes(x = R0, y = log10(P.Emergence), group = m, col = m), linewidth = 2) + #plot p emergence as function of R_wt for each m
+          geom_line(data = probs.emergence.additive, aes(x = R0, y = log10(P.Emergence), group = m, col = m, alpha = 0.75), linewidth = 2) + #plot p emergence as function of R_wt for each m
           theme_bw() + #white background with grey gridlines
           labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with m additive intermediates", col = expression(m)) + #axis and title labels
           scale_x_continuous(breaks = seq(0.2, 1, by = 0.1)) +
@@ -162,7 +163,7 @@ print(plot2)
 ## parameters
 R_wts = seq(0, 1, by = 0.01) #wt R0s to test
 R_adapted = 1000 #R0 of final phenotype
-ms = c(6, 7, 8, 11, 13, 16)
+ms = c(5, 6, 7, 10, 12, 14)
 
 mu = 10^-2 #mutation rate
 
@@ -178,7 +179,7 @@ for(j in 1:length(ms)){
 
 ## format matrix for plotting
 probs.emergence.fixed = cbind(R_wts, probs.emergence.fixed) %>% as.data.frame() #format as dataframe with column denoting the R_wt used to generate the probabilities row-wise and column for each m used to generate the probabilities column-wise
-colnames(probs.emergence.fixed) = c("R0", ms-1) #name the columns for easy referencing
+colnames(probs.emergence.fixed) = c("R0", ms) #name the columns for easy referencing
 probs.emergence.fixed = probs.emergence.fixed %>% #pivot to long-form
   pivot_longer(cols = !R0, #keep R_wt column
                names_to = "m", #add feature denoting "m" used row-wise
@@ -191,7 +192,7 @@ plot = ggplot() +
           labs(x = expression("R"[0] ~ " of introduced pathogen"), y = "Probability of Emergence", title = "probability of emergence with m", col = expression(m)) + #axis and title labels
           scale_x_continuous(breaks = seq(0.2, 1, by = 0.1)) +
           coord_cartesian(ylim = c(-8,0), xlim = c(0.2, 1)) +
-          scale_color_manual(values = my.colors, breaks = ms-1) + #because pretty
+          scale_color_manual(values = my.colors, breaks = ms) + #because pretty
   # aesthetics
           theme_bw() + 
           theme(axis.text = element_text(size = 25),
