@@ -318,4 +318,8 @@ file = here("results", "paper figs", "fig_model_intuition_sigma.jpg")
 ggsave(filename = file, plot = plot4)
 ```
 
-As expected, because we are so close to 1, the fixed step size and the % increase with mutations give rise to very similar curves. I will save the % increase with mutation 
+As expected, because we are so close to 1, the fixed step size and the % increase with mutations give rise to very similar curves. I will save the % increase with mutation
+
+## Branch point 
+
+I will be branching to a new arm of the project, because we need to calculate the nonextinction probability of the branching process to getting to $R_e$ greater than 1, and $R_0$ up to something large, like 3.(what color to plot on the heatmap? color $P_{(Evolution to 3)}$ and line to show where $R_e > 1$?)
