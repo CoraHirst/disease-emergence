@@ -267,7 +267,7 @@ ggsave(filename = file, plot = plot)
 ```
 
 We might want to know, given some $R_0$ of the wildtype variant, what the probability of the whole process evolving $R_0 > 3$ is. 
-One way to plot this is to plot the probability that a process starting with some $R_e$ and a given $R_0$ (where $R_{e,initial} = R_0(1-cF)$) evolves to $R_{e, evolved} = 3(1-cF)$, where $cF = 1-\frac{R_{e,initial}}{R_0}$ and we only plot for the range of $R_e$ where $cF>2/3$ (thus $R_{e, evolved} > 1$).
+One way to plot this is to plot the probability that a process starting with some $R_e$ and a given $R_0$ (where $R_{e,initial} = R_0(1-cF)$) evolves to $R_{e, evolved} = 3(1-cF)$, where $cF = 1-\frac{R_{e,initial}}{R_0}$ and we only plot for the range of $R_e$ where $cF>2/3$ (thus $R_{e, evolved} > 1$). $cF$ is the effective immunity  in the population. 
 
 ```{r plot-R0-to-high-R0}
 # four plots in figure
@@ -371,7 +371,7 @@ filled.contour(x = Frac_immune_vec, y = R0_wt_vec, z=log10(plot.df), nlevels = 2
 ```
 
 
-# Figure showing $P_p$ vs $F(t)$ or time for two different $R_0$ 
+# Figure showing $P_p$ vs $F(t)$ or time for different $R_0$ 
 
 ```{r plot-Pp-over-time}
 # define parms 
@@ -388,11 +388,78 @@ proportion_immune = proportion_immune %>%
   mutate("time" = Year - 1980) %>% # Add time, time post eradication in years 
   mutate("Re_evolved" = R0_evolved*(1-c*prop_immune)) # Add Re_Evolved, the effective reproductive number of the fully evolved variant 
 
+# at which year is Re of the evolved > 1? 
+min_year = proportion_immune %>%
+  filter(Re_evolved > 1) %>% #all rows where Re evolved is > 1
+  select(time) %>% # only want the times post vaccination the condition is true
+  slice(1) %>% pull(time) # first entry will be the minimum, pull reports variable as numeric rather than df
+
 # calculate Pp over time for each R0 
 df = lapply(R0_wt_vec, function(R0_wt){
+  # calculate Re of spillover from proportion immune, calculate Pe frp, proportion immune and 
   pandemic_potential = proportion_immune %>% 
-    mutate("Re_spill" = R0_wt*(1 - c*prop_immune)) %>% # calculate 
-    mutate("Pe" = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved))
+    mutate("Re_spill" = R0_wt*(1 - c*prop_immune)) %>% # calculate Re spillover
+    mutate("Pe" = mapply(pEmergence, sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) %>% #calculate PE
+    mutate("Pp" = 1-(1-Pe)^Se) %>% # calculate pandemic potential
+    mutate("R0" = R0_wt) # add column distinguishing R0
+  # return
+  return(pandemic_potential)
+}) %>% do.call(rbind, .) %>% as.data.frame() #combine dfs to be longform wrt R0 and format as df
+
+
+# plot
+plot = ggplot() + geom_point(data = df, aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), size = 2) +
+  geom_line(data = df, aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), lwd = 1.5) +
+  labs(x = "Time post vaccination, years", y = bquote("log"[10] ~ "probability of emergence per year, P"[P]), col = bquote("R"[0] ~ "at spillover")) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  coord_cartesian(ylim = c(-11, 0)) +
+  geom_hline(yintercept = -5, linetype = "dashed") +
+  geom_vline(xintercept = min_year, linetype = "dashed")
+
+#print to viewer
+print(plot)
+```
+
+##########################
+
+I can do a heatmap with F(t) on the x axis, R0 on the y axis, and p(R0 -> 3) filled in. 
+
+```{r p-r-to-3}
+# define vector of R0 and Frac Immune
+R0_wt_vec = seq(0.75, 1.05, by = 0.001)
+Frac_immune_vec = seq(0, 0.5, by = 0.01)
+
+# define unchanging parms
+sigma = 0.05 # proportional increase in fitness with mutation
+mu = 10^-3 # rate of beneficial mutations per infection
+cp = 0.8 #cross-reactivity
+R0_evolved = 3 # max R0 evolvable
+
+# calculate
+plot.df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(Frac_immune_vec, function(Frac_immune){
+    # calculate R_spill and R_final
+    Re_spill = R0_wt*(1-cp*Frac_immune) 
+    Re_evolved = R0_evolved*(1-cp*Frac_immune)
+    
+    # Caluclate non-extinction probability 
+    return(pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) #run simulation for each R0, Immunity combination
+  })
 })
+
+#plot
+filled.contour(x = Frac_immune_vec, y = R0_wt_vec, z=log10(plot.df), nlevels = 20, lwd = 2,
+               xlab = "Fraction Immune", ylab = expression("R"[0] ~ "of Spillover"), 
+               key.par = list(mar = c(4, 1, 4, 3)),
+               key.title = title(main = expression("P"[E])),
+               plot.axes = {
+                 axis(1)
+                 axis(2)
+                 #arrow pointing left 
+                 arrows(x0 = 0.45, x1 = 0.2, y0 = 0.8, y1 = 0.8, length = 0.1, lwd = 2)
+                 text(x = 0.4, y = 0.81, labels = "Decay over time")
+               })
+
 
 ```
