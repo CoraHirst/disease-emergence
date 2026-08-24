@@ -453,23 +453,11 @@ plot.df = sapply(R0_wt_vec, function(R0_wt){
   })
 })
 
-#plot
-filled.contour(x = Frac_immune_vec, y = R0_wt_vec, z=log10(plot.df), nlevels = 20, lwd = 2,
-               xlab = "Fraction Immune", ylab = expression("R"[0] ~ "of Spillover"), 
-               key.par = list(mar = c(4, 1, 4, 3)),
-               key.title = title(main = expression("P"[E])),
-               plot.axes = {
-                 axis(1)
-                 axis(2)
-                 #arrow pointing left 
-                 arrows(x0 = 0.45, x1 = 0.2, y0 = 0.8, y1 = 0.8, length = 0.1, lwd = 2) #not the same place
-                 text(x = 0.4, y = 0.81, labels = "Decay over time") 
-               })
 
 # greate long form grid
 plot_long <- expand.grid(FracImmune = Frac_immune_vec,
                          R0 = R0_wt_vec) %>%
-  mutate(z = as.vector(log10(plot.df)))
+  mutate(PE = as.vector(log10(plot.df)))
 
 # Build arrow segments from proportion_immune
 times_to_plot = c(25,50,75,100)
@@ -477,21 +465,91 @@ arrow_df <- proportion_immune %>%
   filter(time %in% times_to_plot) %>%
   mutate(x0 = lag(prop_immune, 1),
          x1 = prop_immune,
-         y = 0.8) %>%
+         y = 0.9) %>%
   filter(!is.na(x0))
 
-ggplot(plot_long, aes(x = FracImmune, y = R0, fill = z)) +
+plot = ggplot(plot_long, aes(x = FracImmune, y = R0, fill = ifelse(PE < -14, NA, PE ))) +
   geom_tile() +
-  scale_fill_viridis_c() +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
   geom_segment(data = arrow_df,
                aes(x = x0, xend = x1, y = y, yend = y),
                arrow = arrow(length = unit(0.1, "inches")),
                linewidth = 1, inherit.aes = FALSE) +
   annotate("text", x = proportion_immune %>%
-  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.805, 0.785, 0.805, 0.785), label = times_to_plot,
+  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.905, 0.885, 0.905, 0.885), label = times_to_plot,
            hjust = 0, vjust = 0, size = 5, fontface = "bold") +
   labs(x = "Fraction Immune",
        y = expression("R"[0] ~ "of Spillover"),
        fill = expression("P"[E])) +
+  coord_cartesian(xlim = c(0,0.4)) +
   theme_bw()
+
+#print to view
+print(plot)
+```
+
+We can look at a similar plot but for pandemic potential instead, and use the previous plot in the supplement:
+
+```{r Pp-r-to-3}
+# define vector of R0 and Frac Immune
+R0_wt_vec = seq(0.75, 1.05, by = 0.001)
+Frac_immune_vec = seq(0, 0.5, by = 0.01)
+
+# define unchanging parms
+sigma = 0.05 # proportional increase in fitness with mutation
+mu = 10^-3 # rate of beneficial mutations per infection
+cp = 0.8 #cross-reactivity
+R0_evolved = 3 # max R0 evolvable
+S0 = 10^4
+
+# calculate
+plot.df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(Frac_immune_vec, function(Frac_immune){
+    # calculate R_spill and R_final
+    Re_spill = R0_wt*(1-cp*Frac_immune) 
+    Re_evolved = R0_evolved*(1-cp*Frac_immune)
+    Se_spill = S0*(1-cp*Frac_immune)
+    
+    #calculate p per spill 
+    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)
+    
+    # Caluclate probability of emergence per year
+    return(1-(1-PE)^Se_spill) #run simulation for each R0, Immunity combination
+  })
+})
+
+
+# greate long form grid
+plot_long <- expand.grid(FracImmune = Frac_immune_vec,
+                         R0 = R0_wt_vec) %>%
+  mutate(Pp = as.vector(log10(plot.df)))
+
+# Build arrow segments from proportion_immune
+times_to_plot = c(25,50,75,100)
+arrow_df <- proportion_immune %>%
+  filter(time %in% times_to_plot) %>%
+  mutate(x0 = lag(prop_immune, 1),
+         x1 = prop_immune,
+         y = 0.92) %>%
+  filter(!is.na(x0))
+
+plot = ggplot(plot_long, aes(x = FracImmune, y = R0, fill = ifelse(Pp < -11.5, NA, Pp ))) +
+  geom_tile() +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+      geom_contour(data = plot_long, aes(x = FracImmune, y = R0, z = Pp), breaks = c(-3), col = 'black', linewidth = 1.5, linetype = "dashed") + 
+  geom_segment(data = arrow_df,
+               aes(x = x0, xend = x1, y = y, yend = y),
+               arrow = arrow(length = unit(0.1, "inches")),
+               linewidth = 1, inherit.aes = FALSE) +
+  annotate("text", x = proportion_immune %>%
+  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.925, 0.905, 0.925, 0.905), label = times_to_plot,
+           hjust = 0, vjust = 0, size = 5, fontface = "bold") +
+  labs(x = "Fraction Immune",
+       y = expression("R"[0] ~ "of Spillover"),
+       fill = expression("P"[E])) +
+  coord_cartesian(xlim = c(0,0.4)) +
+  theme_bw()
+
+#print to view
+print(plot)
 ```

@@ -150,4 +150,114 @@ ggsave(filename = file, plot = plot)
 
 ```
 
-# Probability of 
+# Non-immunological factors affecting evolutionary potential per spillover, $P_E$, and per year, $P_p$.
+
+Before considering the effect of waning immunity on increasing evolutionary potential, we would like to understand the how the innate characteristics of the zoonosis affect the process of evolution. In particular, we are interested in 
+
+1) affect size of a given beneficial mutation, which we define as a proportional increase in transmissibility, $\sigma$; 
+2) the rate per infection of acquiring beneficial mutations, $\mu$;
+3) the frequency of spillovers of the zoonosis into the population, $S_0$; and finally,
+4) the inherent transmissibility $R_0$ of the spillover in the population modeled without immunity. 
+
+## Figures 3a and 3b: Emergence probability per spillover, $P_E$
+
+Disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
+
+
+below we plot the probability that a pathogen with a subcritical reproductive number evolves a hihgly infectious (R = 3) reproductive number after spillover: 
+
+```{r Fig-3-a}
+rwt = seq(0.5, 1.5, by = 0.05)
+delta_Rs = c(0.02, 0.05, 0.1, 0.25, 1)
+  
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(delta_Rs, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = y, mu = 10^-3, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(delta_Rs)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "delta_R",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = delta_R, col = delta_R), linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_color_manual(values = my.colors) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", col = expression(sigma)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=24),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )    
+
+#print plot
+print(plot) 
+
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+And now we show how this probability changes with mu: 
+
+```{r fig-3-b}
+rwt = seq(0.5, 1.5, by = 0.05)
+mus = 10^seq(-5, -1, by = 1)
+sigma = 0.1
+  
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(mus, function(y) {
+  sapply(rwt, function(x) {pEmergence_supercrit_deltaR(delta_R = sigma, mu = y, R_wt = x, R_adapted = 10000)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(rwt, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R_wt", as.character(mus)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R_wt,
+  names_to = "mu",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)), alpha = factor(as.numeric(mu))), color = "#4DAF4AFF", linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_alpha_manual(values = c(0.2, 0.4, 0.6, 0.8, 1 ), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
+  labs(x = expression(paste(R[e], " of introduced pathogen")), y = "log P(evolving high R)", alpha = expression(mu)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=25),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )  
+
+#print plot
+print(plot)
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R_mus.png")
+ggsave(filename = file, plot = plot)
+
+```
