@@ -1,0 +1,664 @@
+---
+title: "Manuscript Figures"
+subtitle: "Preventing Disease Emergence Following Eradication: Application to Mpox"
+format: html
+---
+
+```{r setup}
+# load libraries 
+library(ggplot2) #for plotting
+library(here) #for easy local path referencing
+library(tidyverse) #for easy manipulation of data structures
+library(RColorBrewer) #for colors
+library(gridExtra) #for plotting multiple plots in one figure
+library(nleqslv)
+library(ggstance)
+library(scales)
+
+# colors for plotting
+num_cols = 20
+my.colors = brewer.pal(n = 8, name = "Set1")
+my.colors.many = colorRampPalette(my.colors)(num_cols)
+```
+
+# Objective
+
+The goal of this document is to combine work developed in `code/data analysis` and `code/project` to generate a cohesive understanding of the factors that most greatly contribute to the probability of virus evolution out of zoonotic reservoirs and into new species populations. In particular, we are interested in the emergence of zoonoses closely related to viruses that have been eradicated from a population and for which population-level immunity is decreasing.
+
+This document will be divided into three sections: 
+
+1) Visualizing the loss of population-level immunity to smallpox over time and consequences for R
+2) Demonstrating and contextualizing how viruses with low transmissibility can evolve high transmissibility, and how the probability of emergence depends on transmission vs rate of spillover into the new population. 
+3) Showing the sensitivity of the probability of emergence of highly transmissible disease to changes in transmissibility and/or spillover infections, particularly due to waning immunity or increase in immunity as a result of vaccination
+
+All functions for branching processes and their non-extinction probabilities can be found in the file `code/functions/functions.R` and are loaded below. 
+
+```{r load-numerical-functions}
+source(here("code", "functions", "functions.R")) #for current version of adaptive mutation function
+```
+
+All functions required for data analysis and interpretation can be found in the file `code/functions/analysis_functions.R` and are loaded below. 
+
+```{r load-data-analysis-functions}
+source(here("code", "functions", "analysis_functions.R"))
+```
+
+
+NOTE: Code-chunks for generating figures that appear in the manuscript for SI will be labeled with their figure number. 
+
+# Visualizing the loss of population-level immunity to Smallpox and its consequences 
+
+After the eradication of Smallpox and the end of smallpox vaccinations in 1980, the proportion of the population with immunity to smallpox has been slowly decaying. We used a matrix model parameterized by human demographics data reported by the World Health Organization to capture the loss of smallpox immunity at the population level in the Democratic Republic of the Congo from 1980-2023. We then observed how the effective reproductive number of Mpox could be expected to increase as the cross-protection conferred by smallpox immunity is lost. 
+
+## Figure 2: Loss of population level immunity to Smallpox
+
+We observed that the demographics of the Congo have shown little change since 1980, and the country is still undergoing exponential growth. We predicted the continued loss of population level immunity to Smallpox using the matrix model parameterized by the demographics from 2023. 
+
+In the code chunk below, we load the model estimates and projections. These were originally developed in `code/data analysis/congo/matrix_model_projections_2.qmd` and are saved to `results/data analysis/congo/proportion_immune.csv`
+
+```{r load-decaying-immunity}
+proportion_immune = read.csv(here("results", "data analysis", "congo", "proportion_immune.csv"))
+```
+
+Plotted below are the model estimates of the fraction of the population of the DRC with smallpox immunity from 1980-2023 (black) and projected until 2080 (red.)
+
+```{r plot-decaying-immunity}
+plot = ggplot() + 
+            geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year, y = (prop_immune)), col = "black", linewidth = 2) +
+            geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
+            labs(x = "Year", y = "Prop Immune", title = "Decline in portion of population immune to Smallpox, 1980-2023 \nand projected to 2080") +
+            theme(axis.text = element_text(size = 20),
+                  axis.title = element_text(size = 20), 
+                  legend.title = element_text(size = 20),
+                  legend.text = element_text(size = 20)) +
+            theme_bw()  
+```
+
+One concern that arises from this loss of population immunity is the potential for increased transmission in closely related zoonoses that have spilled into the human population. One such related zoonotic virus is Mpox. While the basic reproductive number of Mpox is unknown (difficulty in estimating it arises from obstacles such as heterogeneity in transmission between subpopulations or between outbreaks, remaining population immunity from Smallpox history, and unknown cross-protection against transmission conferred by mpox), we can plot the effective reproductive number of mpox over time relative to it's basic reproductive number, that is, $\frac{R_e}{R_0}$. 
+
+The increase in $\frac{R_e}{R_0}$ as the fraction of the population with smallpox immunity $F_i$ decays is given as $\frac{R_e}{R_0} = 1-cF_I$, where $c$ represents the cross-protection against mpox transmission conferred by smallpox immunity. 
+
+Below, we calculate $\frac{R_e}{R_0}$ for Mpox considering different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r calculate-relative-Re}
+#cross-protection
+cs = seq(0.5, 1, by = 0.1) #half protected to completely protected
+
+#calculate
+##create a matrix with year and predicted Re_r0 for each c. 
+relative.effective.R = sapply(cs, FUN = function(j) { #columns will be cs, rows will be year
+  sapply(proportion_immune$prop_immune, FUN = function(i) {
+    #set cross-reactive fraction immune equal to c*f
+    Re_R0_ratio(j, i)})}) #applying re_r0_ratio function with each c to proportion immune
+
+#add year to resulting matrix, format as dataframe, and rename features
+relative.effective.R = cbind(proportion_immune$Year, relative.effective.R) %>% as.data.frame()
+colnames(relative.effective.R) = c("Year", cs)
+
+#make longform for ease of plotting 
+relative.effective.R = relative.effective.R %>% 
+  pivot_longer(cols = !Year, 
+               names_to = "cross.immunity", 
+               values_to = "relative.Re")
+```
+
+Now, we plot $\frac{R_e}{R_0}$ as a function of time for different degrees of cross-protection conferred by Smallpox immunity. 
+
+```{r plot-relative-Re}
+plot = ggplot() + 
+  geom_line(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year <= 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity)) +
+  geom_point(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year, y = relative.Re, group = cross.immunity, col = cross.immunity), shape = 21) +
+  scale_color_manual(values = my.colors) +
+  labs(x = "Year", y = "relative effective R, Re/R0", title = "increase in Mpox reproductive number") +
+  theme_bw()
+
+```
+
+We plot the loss of smallpox immunity on the left axis and related increase in reproductive number on the right axis. This figure will be saved in `/results/paper figs`.
+
+```{r plot-Fig-2}
+#plotting altogether
+plot = ggplot() + 
+  #plotting relative effective R
+  geom_line(data = relative.effective.R %>% filter(Year <= 2024), aes(x = Year-1980, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2) +
+  geom_line(data = relative.effective.R %>% filter(Year > 2023), aes(x = Year-1980, y = relative.Re, group = cross.immunity, col = cross.immunity), linewidth = 2, alpha = 0.5) +
+  #plotting proportion immune
+  geom_line(data = proportion_immune %>% filter(Year <= 2024), aes(x = Year-1980, y = (prop_immune)), col = "black", linewidth = 2) +
+  geom_line(data = proportion_immune %>% filter(Year > 2023), aes(x = Year-1980, y = (prop_immune)), col = "black", alpha = 0.5, linewidth = 2) +
+  #geom_vline(xintercept = 2023-1980, linetype = "dashed", linewidth = 2) +
+  #adding labels
+  scale_y_continuous(name = expression(paste("Fraction immune to Smallpox ", italic("(F)"))), sec.axis = sec_axis(~., name = expression(paste("Relative effective R ", italic((R["e"]/R["0"])))), breaks = c(0, 0.5, 1)), breaks = c(0, 0.5, 1)) +
+  scale_x_continuous(breaks = c(1980,2000,2020,2040,2060,2080)-1980) +
+  labs(x = "Years post eradication", color = "Cross immunity") +
+  # plot aesthetics
+  theme_bw() + 
+  theme(axis.text = element_text(size = 25),
+        axis.text.y.right = element_text(size = 25, color = "royalblue4"),
+        axis.title = element_text(size = 25),
+        axis.title.y.right = element_text(size = 25, color = "royalblue4"),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 25)) +
+  scale_color_manual(values = brewer.pal(n = length(cs), name = "Blues")) 
+
+#print to plot viewer
+print(plot)
+#save
+file = here("results", "paper figs", "fig_increase_R_with_f.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+# Non-immunological factors affecting evolutionary potential per spillover, $P_E$, and per year, $P_p$.
+
+Before considering the effect of waning immunity on increasing evolutionary potential, we would like to understand the how the innate characteristics of the zoonosis affect the process of evolution. In particular, we are interested in 
+
+1) affect size of a given beneficial mutation, which we define as a proportional increase in transmissibility, $\sigma$; 
+2) the rate per infection of acquiring beneficial mutations, $\mu$;
+3) the inherent transmissibility $R_0$ of the spillover in the population modeled without immunity; and finally,
+4) the frequency of spillovers of the zoonosis into the population, $S_0$.
+
+## Figures 3a and 3b: Emergence probability per spillover, $P_E$
+
+A disease that become supercritical may nevertheless go extinct stochastically after emergence. Here, we plot the probability that a pathogen continues to spread in a population after spillover and evolves $R \geq 3$, the approximate reproductive number of smallpox. 
+
+below we plot the probability that a pathogen with a subcritical basic reproductive number evolves a highly infectious ($R_0$ = 3) reproductive number after spillover, *in a population with no pre-existing immunity* ($R_0 = R_e$): 
+
+```{r Fig-3-a}
+# vars to change
+R0_wt_vec = seq(0.01, 1.5, by = 0.01)
+sigma_vec = c(0.02, 0.05, 0.1, 0.25, 1)
+  
+#static vars 
+R0_evolved = 3
+mu = 10^-3
+
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(sigma_vec, function(sigma) {
+  sapply(R0_wt_vec, function(R0_wt) {pEmergence(sigma = sigma, mu = mu, Re_spill = R0_wt, Re_evolved = R0_evolved)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(R0_wt_vec, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R0_wt", as.character(sigma_vec)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R0_wt,
+  names_to = "sigma",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R0_wt, y = log10(pNE_mtbp), group = sigma, col = sigma), linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(xlim = c(0.5, 1.5), ylim = c(-6, 0)) +
+  scale_color_manual(values = my.colors) +
+  labs(x = expression(paste(R[0], " of introduced pathogen")), y = "log P(evolving high R)", col = expression(sigma)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=24),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25)  # Legend key labels font size
+        )    
+
+#print plot
+print(plot) 
+
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+And now we show how this probability changes with mu: 
+
+```{r fig-3-b}
+# changing vars
+R0_wt_vec = seq(0.5, 1.5, by = 0.05)
+mu_vec = 10^seq(-5, -1, by = 1)
+# static vars
+sigma = 0.1
+R0_evolved = 3
+
+  ### solve for non-extinction probabilities
+pNE_multitype = sapply(mu_vec, function(mu) {
+  sapply(R0_wt_vec, function(R0_wt) {pEmergence(sigma = sigma, mu = mu, Re_spill = R0_wt, Re_evolved = R0_evolved)})
+  }
+) %>%
+  as.data.frame()
+
+# add wildtype Rs and change the column names
+pNE_multitype = cbind(R0_wt_vec, pNE_multitype) %>% as.data.frame() #add a column for wildtype Rs
+colnames(pNE_multitype) = c("R0_wt", as.character(mu_vec)) # add column names for referencing
+
+# finally pivot to longform
+pNE_multitype = pNE_multitype %>% pivot_longer(
+  cols = !R0_wt,
+  names_to = "mu",
+  values_to = "pNE_mtbp"
+)
+
+# plot
+
+plot = ggplot() + #plotting the results for less than 1 with the results for greater than 1
+  geom_line(data = pNE_multitype, aes(x = R0_wt, y = log10(pNE_mtbp), group = factor(as.numeric(mu)), linetype = factor(as.numeric(mu))), color = "#4DAF4AFF", linewidth = 1.5) +
+  #axes and titles
+  scale_x_continuous(breaks = c(0.5,1,1.5)) +
+  coord_cartesian(ylim = c(-6, 0)) +
+  scale_linetype_manual(values = c("dotted", "dotdash", "twodash", "dashed", "solid" ), labels = c(expression(10^-5), expression(10^-4), expression(10^-3), expression(10^-2), expression(10^-1))) +
+  labs(x = expression(paste(R[0], " of introduced pathogen")), y = expression(paste(log[10], " P(evolving high R)")), linetype = expression(mu)) +
+  #aesthetics
+  theme_bw() +
+  theme(axis.text=element_text(size=25),
+        axis.title=element_text(size=25),
+        legend.title = element_text(size = 25), # Legend title font size
+        legend.text = element_text(size = 25),  # Legend key labels font size
+        legend.key.width = unit(1.5, "cm") #changes length of legend lines
+        )  
+
+#print plot
+print(plot)
+
+#save 
+file = here("results", "paper figs", "fig_subcritical_to_high_R_mus.png")
+ggsave(filename = file, plot = plot)
+
+```
+
+## Supplementary Figures and Figure 4: Pandemic potential, $P_P$
+
+The total probability of emergence (of a highly transmissible disease, $R \approx 3$) in a given year, $P_P$, is a function of the probability of emergence per spillover ($P_E$) and the rate of spillovers per year ($S$). The number of spillovers per year is the rate of spillovers multiplied by the unit time, 1 year, such that $n = S(1) = S$. Treating disease emergence as a Bernoulli process, the total probability of emergence in a year can be calculated as:
+
+$$ 
+P_P = 1 - (1-P_E)^{n}
+$$
+
+$P_E$ is a function of the initial reproductive number after spillover, $R_{spill}$; the rate at which adaptive mutations are acquired per-infection, $\mu$; and, importantly, the proportional increase in fitness conferred by a beneficial mutation, $\sigma$. We note that changes in the reproductive number of a variant due to non-pharameutical interventions that change contact rates (such as social distancing) can affect both $S$ and $R_{spill}$. We thus plot a series of heatmaps showing the total probability of emergence over the course of a year given a range of mutation rates and $\sigma$s for various combinations of $S$ and $R_{spill}$.
+
+
+
+Below, we plot how the probability of emergence of highly transmissible disease changes as a function of $R0_{spill}$ and $S$ for a range of $\sigma$ and $\mu$.
+
+```{r heatmaps-S-Rspill}
+#function pEmergence calculates the probability of evolution to R = 3 default
+#function total_P calculates the probability of emergence of a length of time years given spillover rate per year and proabability of emergence per spillover. 
+
+### define parm ranges
+R0_evolved = 3
+mu_vec = c(10^-4, 10^-3) #rows of grid
+sigma_vec = c(0.05, 0.1) #columns of grid
+
+R0_wt_vec = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+S_vec = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+#Ss = seq(1, 10^5, 1000) #for linear y
+
+#generate list of plots to format as grid
+plots = lapply(mu_vec, function(mu){ #rows of grid
+          lapply(sigma_vec, function(sigma){ #columns of grid
+            
+            ## vector of ps
+            PE_vec = sapply(R0_wt_vec, function(R0_wt){ # iterates over all spillover R for a given mu and sigma 
+                    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = R0_wt, Re_evolved = R0_evolved) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+            ## calculate total P for each ps and S combination
+            Pp_df = sapply(S_vec, function(S){ #outside is columns
+              sapply(PE_vec, function(PE){ #inside is rows
+                Pp = total_P(p=PE, S=S, years=1) #probability of emergence over a single year
+              })
+            }) %>% cbind(R0_wt_vec, .) %>% as.data.frame()
+            
+            # format df for plotting
+            colnames(Pp_df) = c("R0_wt", S_vec) #name columns
+            Pp_df_long = Pp_df %>% pivot_longer(cols = !R0_wt, #format dataframe as long form
+                                     names_to = "S",
+                                     values_to = "Pp") %>% as.data.frame()
+
+            ## Plot
+            plot = ggplot() + geom_tile(data = Pp_df_long, aes(x = R0_wt, y = log10(as.numeric(S)), fill = log10(Pp))) + #plot heatmap
+              labs(x = expression(paste(R[0], " of introduced pathogen")), y = expression(paste(Log[10], " spillover rate ", year^-1)), title = paste0("mu is ", mu, " sigma is ", sigma), legend = expression(paste(log[10], "P"))) + #change titles
+              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") + #change fill colors
+              geom_contour(data = Pp_df_long, aes(x = R0_wt, y = log10(as.numeric(S)), z = log10(Pp)), breaks = c(-3), col = 'black',linewidth = 1.5) + #contour where Pp = 10^-3
+              #aesthetics
+              theme_classic() +
+              theme(axis.text=element_text(size=24),
+                    axis.title=element_text(size=24),
+                    legend.title = element_text(size = 24), # Legend title font size
+                    legend.text = element_text(size = 16)  # Legend key labels font size
+                    )    
+              
+  
+            return(plot)
+   })
+})
+
+#plot
+plots = do.call("c", (plots))
+do.call(grid.arrange, c(plots, nrow = 2))
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential.jpg")
+ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+```
+
+We can plot the same curves with spillover rate on a linear scale to see just how striking the difference in interventions on spillover rate versus transmission truly are: 
+
+```{r heatmap-S-Rspill-linear}
+### define parm ranges
+R0_evolved = 3
+mu_vec = c(10^-4, 10^-3) #rows of grid
+sigma_vec = c(0.05, 0.1) #columns of grid
+
+R0_wt_vec = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+S_vec = seq(1, 10^5, 1000) #for linear y
+
+#generate list of plots to format as grid
+plots = lapply(mu_vec, function(mu){ #rows of grid
+          lapply(sigma_vec, function(sigma){ #columns of grid
+            
+            ## vector of ps
+            PE_vec = sapply(R0_wt_vec, function(R0_wt){ # iterates over all spillover R for a given mu and sigma 
+                    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = R0_wt, Re_evolved = R0_evolved) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+            ## calculate total P for each ps and S combination
+            Pp_df = sapply(S_vec, function(S){ #outside is columns
+              sapply(PE_vec, function(PE){ #inside is rows
+                Pp = total_P(p=PE, S=S, years=1) #probability of emergence over a single year
+              })
+            }) %>% cbind(R0_wt_vec, .) %>% as.data.frame()
+            
+            # format df for plotting
+            colnames(Pp_df) = c("R0_wt", S_vec) #name columns
+            Pp_df_long = Pp_df %>% pivot_longer(cols = !R0_wt, #format dataframe as long form
+                                     names_to = "S",
+                                     values_to = "Pp") %>% as.data.frame()
+
+            ## Plot
+            plot = ggplot() + geom_tile(data = Pp_df_long, aes(x = R0_wt, y = (as.numeric(S)), fill = log10(Pp))) + #plot heatmap
+              labs(x = expression(paste(R[0], " of introduced pathogen")), y = expression(paste(Log[10], " spillover rate ", year^-1)), title = paste0("mu is ", mu, " sigma is ", sigma), legend = expression(paste(log[10], "P"))) + #change titles
+              scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") + #change fill colors
+              geom_contour(data = Pp_df_long, aes(x = R0_wt, y = (as.numeric(S)), z = log10(Pp)), breaks = c(-3), col = 'black',linewidth = 1.5) + #contour where Pp = 10^-3
+              #aesthetics
+              theme_classic() +
+              theme(axis.text=element_text(size=24),
+                    axis.title=element_text(size=24),
+                    legend.title = element_text(size = 24), # Legend title font size
+                    legend.text = element_text(size = 16)  # Legend key labels font size
+                    )    
+              
+  
+            return(plot)
+   })
+})
+
+#plot
+plots = do.call("c", (plots))
+do.call(grid.arrange, c(plots, nrow = 2))
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_linearS.jpg")
+ggsave(filename = file, plot = do.call(grid.arrange, c(plots, nrow = 2)))
+```
+
+Figure 4 is a single demonstrative pannel, and we choose to show the spillover rate y-axis on a log10 scale. 
+
+```{r fig-4}
+### define parm ranges
+R0_evolved = 3
+mu_vec = 10^-3 #rows of grid
+sigma = 0.05 #columns of grid
+
+R0_wt_vec = seq(0.75, 1, by = 0.01) #wt R0s to test, x axis of plots
+S_vec = 10^seq(0,5, by = 0.1) #spillovers/year, y axis of plots 
+#Ss = seq(1, 10^5, 1000) #for linear y
+
+# Calculate Pp
+  ## vector of ps
+  PE_vec = sapply(R0_wt_vec, function(R0_wt){ # iterates over all spillover R for a given mu and sigma 
+          PE = pEmergence(sigma = sigma, mu = mu, Re_spill = R0_wt, Re_evolved = R0_evolved) }) # generates a vector containing probabilities of emergence per spillover, withhighest R set to 3 as default
+          
+  ## calculate total P for each ps and S combination
+  Pp_df = sapply(S_vec, function(S){ #outside is columns
+    sapply(PE_vec, function(PE){ #inside is rows
+      Pp = total_P(p=PE, S=S, years=1) #probability of emergence over a single year
+    })
+  }) %>% cbind(R0_wt_vec, .) %>% as.data.frame()
+  
+  # format df for plotting
+  colnames(Pp_df) = c("R0_wt", S_vec) #name columns
+  Pp_df_long = Pp_df %>% pivot_longer(cols = !R0_wt, #format dataframe as long form
+                           names_to = "S",
+                           values_to = "Pp") %>% as.data.frame()
+
+## Plot
+plot = ggplot() + geom_tile(data = Pp_df_long, aes(x = R0_wt, y = log10(as.numeric(S)), fill = log10(Pp))) + #plot heatmap
+  labs(x = expression(paste(R[0], " of introduced pathogen")), y = expression(paste(Log[10], " spillover rate ", year^-1)), title = paste0("mu is ", mu, " sigma is ", sigma), legend = expression(paste(log[10], "P"))) + #change titles
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") + #change fill colors
+  geom_contour(data = Pp_df_long, aes(x = R0_wt, y = log10(as.numeric(S)), z = log10(Pp)), breaks = c(-3), col = 'black',linewidth = 1.5) + #contour where Pp = 10^-3
+  #aesthetics
+  theme_classic() +
+  theme(axis.text=element_text(size=24),
+        axis.title=element_text(size=24),
+        legend.title = element_text(size = 24), # Legend title font size
+        legend.text = element_text(size = 16)  # Legend key labels font size
+        )    
+              
+# print to viewer
+print(plot)
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_single.jpg")
+ggsave(filename = file, plot = plot)
+
+```
+
+# Changes in emergence probability due to changes in transmissibility 
+
+We have demonstrated that, in a population with no immunity, the probability of evolution of a disease to a high reproductive number is likely to depend more on the rate of transmission post-spillover than the frequency of spillovers; that is, the probability of evolution per spillover $P_E$ has a greater impact than the number of spillovers, $S$. 
+
+As immunity wanes in the population, both the transmissibility ($R_e$) and spillover rate ($S_e$) increase. Below, we examine how $P_E$ and $P_P$ might change as immunity wanes and $R_e$ and $S_e$ increase. 
+
+Because we are interested in a pathogen evolving to some peak transmissibility, a change in $P_E$ and thus $P_P$ over time can be calculated for any given innate and peak adapted $R_0$. 
+
+We define $R_{e,spill}$ as the effective reproductive number of the spillover infection, and $R_{e, evolved}$ as the effective reproductive number of the pathogen whose $R_0$ has evolved to high $R_0 = 3$.
+
+In the branching process model: 
+
+The transmissibility of the first type, $R_{e, spill}$ is defined as $R_{0,wildtype}*(1-cF)$. 
+The transmissibility of the final evolved type is $R_{e, evolved} = R_{0,evolved}*(1-cF)$. 
+The number of mutants is calculated as $\frac{(log_{10}(R_{e,evolved} - log_{10}(R_{e,spill})}{log_{10}(1+\sigma)} + 1$, and the transmissibility of each type is $1+\sigma$X greater than the transmissibility of the last type. 
+
+Below, we plot $P_e$ as a function of the fraction of immunity remaining in the population, and the $R_0$ of the wildtype pathogen. Notice we set cross protection $c$ to 0.8, the estimate for the cross-reactivity between mpox and smallpox immunity. We include arrow to show how quickly immunity decays over time, according to the demographic data from the DRC (Figure 2):
+
+
+```{r PE-waning-immunity}
+# define vector of R0 and Frac Immune
+R0_wt_vec = seq(0.75, 1.05, by = 0.001)
+Frac_immune_vec = seq(0, 0.5, by = 0.01)
+
+# define unchanging parms
+sigma = 0.05 # proportional increase in fitness with mutation
+mu = 10^-3 # rate of beneficial mutations per infection
+c = 0.8 #cross-reactivity
+R0_evolved = 3 # max R0 evolvable
+
+# calculate
+plot.df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(Frac_immune_vec, function(Frac_immune){
+    # calculate R_spill and R_final
+    Re_spill = R0_wt*(1-c*Frac_immune) 
+    Re_evolved = R0_evolved*(1-c*Frac_immune)
+    
+    # Caluclate non-extinction probability 
+    return(pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) #run simulation for each R0, Immunity combination
+  })
+})
+
+
+# greate long form grid
+plot_long <- expand.grid(FracImmune = Frac_immune_vec,
+                         R0 = R0_wt_vec) %>%
+  mutate(PE = as.vector(log10(plot.df)))
+
+# Build arrow segments from proportion_immune
+times_to_plot = c(25,50,75,100)
+arrow_df <- proportion_immune %>%
+  filter(time %in% times_to_plot) %>%
+  mutate(x0 = lag(prop_immune, 1),
+         x1 = prop_immune,
+         y = 0.9) %>%
+  filter(!is.na(x0))
+
+plot = ggplot(plot_long, aes(x = FracImmune, y = R0, fill = ifelse(PE < -14, NA, PE ))) +
+  geom_tile() +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+  geom_segment(data = arrow_df,
+               aes(x = x0, xend = x1, y = y, yend = y),
+               arrow = arrow(length = unit(0.1, "inches")),
+               linewidth = 1, inherit.aes = FALSE) +
+  annotate("text", x = proportion_immune %>%
+  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.905, 0.885, 0.905, 0.885), label = times_to_plot,
+           hjust = 0, vjust = 0, size = 5, fontface = "bold") +
+  labs(x = "Fraction Immune",
+       y = expression("R"[0] ~ "of Spillover"),
+       fill = expression("P"[E])) +
+  coord_cartesian(xlim = c(0,0.4)) +
+  theme_bw()
+
+#print to view
+print(plot)
+
+#save 
+file = here("results", "paper figs", "fig_probability_emergence_waning.jpg")
+ggsave(filename = file, plot = plot)
+
+```
+
+We can look at a similar plot but for pandemic potential instead, and use the previous plot in the supplement:
+
+```{r Pp-waning-immunity}
+# define vector of R0 and Frac Immune
+R0_wt_vec = seq(0.75, 1.05, by = 0.001)
+Frac_immune_vec = seq(0, 0.5, by = 0.01)
+
+# define unchanging parms
+sigma = 0.05 # proportional increase in fitness with mutation
+mu = 10^-3 # rate of beneficial mutations per infection
+cp = 0.8 #cross-reactivity
+R0_evolved = 3 # max R0 evolvable
+S0 = 10^4
+
+# calculate
+plot.df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(Frac_immune_vec, function(Frac_immune){
+    # calculate R_spill and R_final
+    Re_spill = R0_wt*(1-cp*Frac_immune) 
+    Re_evolved = R0_evolved*(1-cp*Frac_immune)
+    Se_spill = S0*(1-cp*Frac_immune)
+    
+    #calculate p per spill 
+    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)
+    
+    # Caluclate probability of emergence per year
+    return(1-(1-PE)^Se_spill) #run simulation for each R0, Immunity combination
+  })
+})
+
+
+# greate long form grid
+plot_long <- expand.grid(FracImmune = Frac_immune_vec,
+                         R0 = R0_wt_vec) %>%
+  mutate(Pp = as.vector(log10(plot.df)))
+
+# Build arrow segments from proportion_immune
+times_to_plot = c(25,50,75,100)
+arrow_df <- proportion_immune %>%
+  filter(time %in% times_to_plot) %>%
+  mutate(x0 = lag(prop_immune, 1),
+         x1 = prop_immune,
+         y = 0.92) %>%
+  filter(!is.na(x0))
+
+plot = ggplot(plot_long, aes(x = FracImmune, y = R0, fill = ifelse(Pp < -11.5, NA, Pp ))) +
+  geom_tile() +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+      geom_contour(data = plot_long, aes(x = FracImmune, y = R0, z = Pp), breaks = c(-3), col = 'black', linewidth = 1.5, linetype = "dashed") + 
+  geom_segment(data = arrow_df,
+               aes(x = x0, xend = x1, y = y, yend = y),
+               arrow = arrow(length = unit(0.1, "inches")),
+               linewidth = 1, inherit.aes = FALSE) +
+  annotate("text", x = proportion_immune %>%
+  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.925, 0.905, 0.925, 0.905), label = times_to_plot,
+           hjust = 0, vjust = 0, size = 5, fontface = "bold") +
+  labs(x = "Fraction Immune",
+       y = expression("R"[0] ~ "of Spillover"),
+       fill = expression("P"[E])) +
+  coord_cartesian(xlim = c(0,0.4)) +
+  theme_bw()
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_waning.jpg")
+ggsave(filename = file, plot = plot)
+```
+
+Finally, we might want to see these dynamics as a function of time post vaccination: 
+
+```{r plot-Pp-over-time}
+# define parms 
+c = 0.8 # cross reactivity of eradicated disease with zoonotic disease
+R0_evolved = 3 # R0 of most evolved variant - perhaps the R0 of the eradicated disease
+
+R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
+
+S0 = 10^4
+
+# Add Se over time, Re evolved, and years post eradication 
+proportion_immune = proportion_immune %>%
+  mutate("Se" = S0*(1-c*prop_immune)) %>% # spillover rate increases with time towards Se like Re increases towards R0 with mutation. 
+  mutate("time" = Year - 1980) %>% # Add time, time post eradication in years 
+  mutate("Re_evolved" = R0_evolved*(1-c*prop_immune)) # Add Re_Evolved, the effective reproductive number of the fully evolved variant 
+
+# at which year is Re of the evolved > 1? 
+min_year = proportion_immune %>%
+  filter(Re_evolved > 1) %>% #all rows where Re evolved is > 1
+  select(time) %>% # only want the times post vaccination the condition is true
+  slice(1) %>% pull(time) # first entry will be the minimum, pull reports variable as numeric rather than df
+
+# calculate Pp over time for each R0 
+df = lapply(R0_wt_vec, function(R0_wt){
+  # calculate Re of spillover from proportion immune, calculate Pe frp, proportion immune and 
+  pandemic_potential = proportion_immune %>% 
+    mutate("Re_spill" = R0_wt*(1 - c*prop_immune)) %>% # calculate Re spillover
+    mutate("Pe" = mapply(pEmergence, sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) %>% #calculate PE
+    mutate("Pp" = 1-(1-Pe)^Se) %>% # calculate pandemic potential
+    mutate("R0" = R0_wt) # add column distinguishing R0
+  # return
+  return(pandemic_potential)
+}) %>% do.call(rbind, .) %>% as.data.frame() #combine dfs to be longform wrt R0 and format as df
+
+
+# plot
+plot = ggplot() + geom_point(data = df, aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), size = 2) +
+  geom_line(data = df, aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), lwd = 1.5) +
+  labs(x = "Time post vaccination, years", y = bquote("log"[10] ~ "probability of emergence per year, P"[P]), col = bquote("R"[0] ~ "at spillover")) +
+  theme_bw() +
+  scale_color_manual(values = my.colors) +
+  coord_cartesian(ylim = c(-11, 0)) +
+  geom_hline(yintercept = -5, linetype = "dashed") +
+  geom_vline(xintercept = min_year, linetype = "dashed")
+
+#print to viewer
+print(plot)
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_over_time.jpg")
+ggsave(filename = file, plot = plot)
+```
+
+

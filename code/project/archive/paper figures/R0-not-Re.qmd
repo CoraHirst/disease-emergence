@@ -329,7 +329,7 @@ do.call(grid.arrange, plots)
  
 Nearly identical, except for the range of plotting. 
 
-I can do a heatmap with F(t) on the x axis, R0 on the y axis, and p(R0 -> 3) filled in. 
+I can do a heatmap with F(t) on the x axis, R0 on the y axis, and p(R0 -> 3) filled in.This will be in the absence of immunity.  
 
 ```{r p-r-to-3}
 # define vector of R0 and Frac Immune
