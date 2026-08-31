@@ -570,7 +570,7 @@ plot.df = sapply(R0_wt_vec, function(R0_wt){
     # calculate R_spill and R_final
     Re_spill = R0_wt*(1-c*Frac_immune) 
     Re_evolved = R0_evolved*(1-c*Frac_immune)
-    Se_spill = S0*(1-cp*Frac_immune)
+    Se_spill = S0*(1-c*Frac_immune)
     
     #calculate p per spill 
     PE = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)
@@ -623,6 +623,82 @@ print(plot)
 
 #save 
 file = here("results", "paper figs", "fig_pandemic_potential_waning.jpg")
+ggsave(filename = file, plot = plot)
+```
+
+and show how linear changes in $S$ do not have as great an effect on $P_P$: 
+
+```{r SI-Pp-waning-immunity}
+# define vector of R0 and Frac Immune
+R0_wt = 0.9
+Frac_immune_vec = seq(0, 0.5, by = 0.01)
+
+# define unchanging parms
+sigma = 0.1 # proportional increase in fitness with mutation
+mu = 10^-3 # rate of beneficial mutations per infection
+c = 0.8 #cross-reactivity
+R0_evolved = 3 # max R0 evolvable
+S0_wt_vec = seq(1, 10^5, 1000) #for linear y
+
+# calculate
+plot.df = sapply(S0_wt_vec, function(S0){
+  sapply(Frac_immune_vec, function(Frac_immune){
+    # calculate R_spill and R_final
+    Re_spill = R0_wt*(1-c*Frac_immune) 
+    Re_evolved = R0_evolved*(1-c*Frac_immune)
+    Se_spill = S0*(1-c*Frac_immune)
+    
+    #calculate p per spill 
+    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)
+    
+    # Caluclate probability of emergence per year
+    return(1-(1-PE)^Se_spill) #run simulation for each R0, Immunity combination
+  })
+})
+
+
+# greate long form grid
+plot_long <- expand.grid(FracImmune = Frac_immune_vec,
+                         S0 = S0_wt_vec) %>%
+  mutate(Pp = as.vector(log10(plot.df)))
+
+# Build arrow segments from proportion_immune
+times_to_plot = c(25,50,75,100)
+arrow_df <- proportion_immune %>%
+  filter(time %in% times_to_plot) %>%
+  mutate(x0 = lag(prop_immune, 1),
+         x1 = prop_immune,
+         y = 5*10^4) %>%
+  filter(!is.na(x0))
+
+plot = ggplot() +
+  geom_tile(data = plot_long, aes(x = FracImmune, y = S0, fill = ifelse(Pp < -11.5, NA, Pp ))) +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+      geom_contour(data = plot_long, aes(x = FracImmune, y = S0, z = Pp), breaks = c(-3), col = 'black', linewidth = 1.5, linetype = "dashed") + 
+  geom_segment(data = arrow_df,
+               aes(x = x0, xend = x1, y = y, yend = y),
+               arrow = arrow(length = unit(0.1, "inches")),
+               linewidth = 1, inherit.aes = FALSE) +
+  annotate("text", x = proportion_immune %>%
+  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(5.5*10^4,4.5*10^4, 5.5*10^4,4.5*10^4), label = times_to_plot,
+           hjust = 1, vjust = 0.5, size = 8, fontface = "bold") +
+  labs(x = "Fraction Immune",
+       y = expression("S"[0] ~ "of Spillover"),
+       fill = expression("P"[P])) +
+  scale_x_reverse(expand = c(0.005,0)) +
+  scale_y_continuous(expand = c(0.001,0)) +
+  coord_cartesian(xlim = c(0.4,0)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 22),
+        axis.title = element_text(size = 25),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 22))
+
+# print to viewer
+print(plot)
+
+#save 
+file = here("results", "paper figs", "fig_pandemic_potential_S0_waning.jpg")
 ggsave(filename = file, plot = plot)
 ```
 
