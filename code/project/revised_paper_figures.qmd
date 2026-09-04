@@ -550,7 +550,156 @@ ggsave(filename = file, plot = plot)
 
 ```
 
-We can look at a similar plot but for pandemic potential instead, and use the previous plot in the supplement:
+We can look at a similar plot but instead showing the change in $s$ toward $s_0$ with waning immunity, and the corresponding $R_e$ and $P_p$ for different $R_0$:
+
+```{r Re-S-heatmap}
+#transmission and spillover parms
+R0_evolved = 3
+S0 = 10^3
+Frac_immune_vec = seq(0.01, 1, by = 0.01)
+Re_spill_vec = seq(0.01, 1.05, by = 0.01)
+
+#defining pathogen parms
+c = 0.8 
+mu = 10^-3
+sigma = 0.1 
+
+# heatmap 
+df = sapply(Frac_immune_vec, function(Frac_immune){
+  sapply(Re_spill_vec, function(Re_spill){
+     Se = S0*(1-c*Frac_immune) #calculate Se
+     Re_evolved = R0_evolved*(1-c*Frac_immune) #calculate Re
+        if(Re_spill < Re_evolved){ #can only calculate Pe when Respill < Re_evolved
+          Pe = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved) #calculate probability of emergence per introduction
+          Pp = total_P(p = Pe, S = Se, years = 1) #in one year
+    return(Pp)}
+    else(return(NA))
+  })
+}) %>% cbind(Re_spill_vec, .) %>% as.data.frame()
+
+#name columns for plotting
+colnames(df) = c("Re_spill", as.character(S0*(1-c*Frac_immune_vec))) # colnames correspond to Se at that frac immune
+
+#convert to longform 
+df_long = df %>% pivot_longer(
+  cols = !c("Re_spill"), 
+  names_to = "Se",
+  values_to = "Pp"
+  
+)
+
+## plot
+plot1 = ggplot() +
+  geom_tile(data = df_long, aes(x = Re_spill, y = as.numeric(Se), fill = log10(Pp))) +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+  geom_abline(slope = S0/R0_evolved, intercept = 0, color = "black", linetype = "solid", linewidth = 1) + #contour where Re spill > Re Evolved 
+  labs(x = expression("R"[e] ~ " of Spillover"),
+       y = expression("s"[e] ~ "of Spillover"),
+       fill = expression("log"[10] ~ "P"[p])) +
+  scale_y_continuous(expand = c(0,0), breaks = c(200,300,400,500,600,700,800,900,1000)) +
+  scale_x_continuous(limits = c(0.25, 1), expand = c(0,0)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 25))
+
+#print to view
+print(plot1)
+
+### add trajectories
+# defining transmission and spillover parms
+R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
+Se_vec = S0*(1 - c*proportion_immune$prop_immune) # Se corresponding to change in frac immune over time
+
+Re_df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(proportion_immune$prop_immune, function(frac_immune){
+    Re_spill = R0_wt*(1-c*frac_immune)
+  }) 
+}) %>% cbind(Se_vec, proportion_immune$time, .) %>% as.data.frame()
+
+#name columns
+colnames(Re_df) = c("Se", "time", as.character(R0_wt_vec))
+
+#longform
+Re_df = Re_df %>% pivot_longer(
+  cols = !c(Se,time),
+  names_to = "R0_wt", 
+  values_to = "Re_spill"
+)
+
+for(i in R0_wt_vec){
+plot1 = plot1 + geom_segment(data = Re_df %>% filter(R0_wt == i, time %% 10 == 0), 
+            aes(x = Re_spill, y = Se, xend = c(tail(Re_spill, n = -1),NA), yend = c(tail(Se, n = -1),NA),  colour = factor(R0_wt)), 
+            arrow = arrow(length = unit(0.3,"cm")),
+            linewidth = 1.25) +
+   geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %in% c(2000, 2030, 2080)), aes(x = Re, y = log10(S), label = Year),
+            nudge_x = -0.01,
+            nudge_y = 0.1,
+            fontface = "bold",
+            size = 5) +
+  scale_color_manual(values = c("azure1", "azure2", "azure3", "azure4"))
+}
+#print to view
+print(plot1)
+
+```
+
+```{r }
+# defining transmission and spillover parms
+R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
+R0_evolved = 3
+S0 = 10^3
+Frac_immune_vec = seq(0, 1, by = 0.01)
+
+#defining pathogen parms
+c = 0.8 
+mu = 10^-3
+sigma = 0.1 
+
+# Calculate Se and Re, Evolved for each Frac_Immune
+Se_vec = S0*(1-c*Frac_immune_vec) 
+Re_evolved_vec = R0_evolved*(1-c*Frac_immune_vec)
+
+# save as df
+parms_df = data.frame("Frac_immune" = Frac_immune_vec, 
+                      "Se" = Se_vec,
+                      "Re_evolved" = Re_evolved_vec)
+
+# Iterate through R0 wildtype to calculate Pp
+df_long = lapply(R0_wt_vec, function(R0_wt){
+  # calculate corresponding Re spillover 
+  df = parms_df %>%
+    mutate(Re_spill = R0_wt*(1-c*Frac_immune))
+  # calculate Pp 
+  df = df %>% 
+    rowwise() %>%
+    mutate(Pe = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) %>%
+    mutate(Pp = 1-(1-Pe)^Se)
+  # add R0 tag
+  df = df %>% 
+    mutate(R0_wt = R0_wt)
+}) %>% do.call(rbind,.) %>% as.data.frame() # combine all dfs into a single, long form df wrt R0_wt
+
+# plot
+plot = ggplot(df_long, aes(x = Re_spill, y = Se, fill = log10(Pp))) +
+  geom_tile() +
+  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
+  labs(x = expression("R"[e] ~ " of Spillover"),
+       y = expression("s"[e] ~ "of Spillover"),
+       fill = expression("log"[10] ~ "P"[p])) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 25))
+
+#print to view
+print(plot)
+
+```
+
+
 
 ```{r Pp-waning-immunity}
 # define vector of R0 and Frac Immune
