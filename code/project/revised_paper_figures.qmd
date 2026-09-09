@@ -481,7 +481,6 @@ The number of mutants is calculated as $\frac{(log_{10}(R_{e,evolved} - log_{10}
 Below, we plot $P_e$ as a function of the fraction of immunity remaining in the population, and the $R_0$ of the wildtype pathogen. Notice we set cross protection $c$ to 0.8, the estimate for the cross-reactivity between mpox and smallpox immunity. We include arrow to show how quickly immunity decays over time, according to the demographic data from the DRC (Figure 2). 
 
 ```{r PE-waning-immunity}
-
 # define vector of R0 and Frac Immune
 R0_wt_vec = seq(0.5, 1.05, by = 0.001)
 Frac_immune_vec = seq(0, 0.5, by = 0.01)
@@ -697,8 +696,9 @@ df_long = df %>% pivot_longer(
 plot1 = ggplot() +
   geom_tile(data = df_long, aes(x = Re_spill, y = as.numeric(Se), fill = log10(Pp))) +
   scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
-  labs(x = expression("R"[e] ~ " of Spillover"),
-       y = bquote(atop("s"[e] ~ "of Spillover", "Over Time Post-Eradication")),
+  geom_contour(data = df_long, aes(x = Re_spill, y = as.numeric(Se), z = log10(Pp)), breaks = c(-3), col = 'black', linetype = "dashed", linewidth = 1.5) +
+  labs(x = expression("R"[e] ~ " of spillover"),
+       y = bquote(atop("s"[e] ~ "of spillover", "over time post-eradication")),
        fill = expression("log"[10] ~ "P"[p])) +
   coord_cartesian(xlim = c(0.5, 1)) +
   scale_y_continuous(expand = c(0,10), limits = c(S0*(1-c*max_frac), 1000), breaks = c(400,500,600,700,800,900,1000)) +
@@ -742,9 +742,9 @@ plot1 = plot1 + geom_segment(data = Re_df %>% filter(R0_wt == i, time %% 10 == 0
             nudge_x = 0.01,
             nudge_y = -10,
             fontface = "bold",
-            size = 5) +
-  labs(col = expression(R[0] ~ "of spillover")) +
-  scale_color_manual(values = c("azure1", "azure2", "azure3", "azure4"))
+            size = 8) +
+  labs(col = bquote(atop(R[0] ~ "of", "spillover"))) +
+  scale_color_manual(values = my.colors)
 }
 
 #print to view
@@ -752,7 +752,7 @@ print(plot1)
 
 #save 
 file = here("results", "paper figs", "fig_pandemic_potential_waning.jpg")
-ggsave(filename = file, plot = plot)
+ggsave(filename = file, plot = plot1)
 
 ```
 
@@ -873,7 +873,7 @@ df = lapply(R0_wt_vec, function(R0_wt){
 # plot
 plot = ggplot() + geom_point(data = df %>% filter(time %% 5 == 0), aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), size = 3) +
   geom_line(data = df %>% filter(time %% 5 == 0), aes(x = time, y = log10(Pp), group = factor(R0), col = factor(R0)), lwd = 2) +
-  labs(x = "Time post vaccination, years", y = bquote(atop("log"[10] ~ "probability of emergence", "per year, P"[P])), col = bquote("R"[0] ~ "at spillover")) +
+  labs(x = "Time post vaccination, years", y = bquote(atop("log"[10] ~ "probability of", "emergence per year, P"[P])), col = bquote(atop("R"[0] ~ "of", "spillover"))) +
   theme_bw() +
   scale_color_manual(values = my.colors) +
   coord_cartesian(ylim = c(-11, 0)) +
