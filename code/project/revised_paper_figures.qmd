@@ -556,7 +556,7 @@ We can look at a similar plot but instead showing the change in $s$ toward $s_0$
 #transmission and spillover parms
 R0_evolved = 3
 S0 = 10^3
-Frac_immune_vec = seq(0.01, 1, by = 0.01)
+Frac_immune_vec = seq(0.00, 1, by = 0.01)
 Re_spill_vec = seq(0.01, 1.05, by = 0.01)
 
 #defining pathogen parms
@@ -610,20 +610,23 @@ print(plot1)
 ### add trajectories
 # defining transmission and spillover parms
 R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
-Se_vec = S0*(1 - c*proportion_immune$prop_immune) # Se corresponding to change in frac immune over time
 
 Re_df = sapply(R0_wt_vec, function(R0_wt){
   sapply(proportion_immune$prop_immune, function(frac_immune){
     Re_spill = R0_wt*(1-c*frac_immune)
   }) 
-}) %>% cbind(Se_vec, proportion_immune$time, .) %>% as.data.frame()
+}) %>% cbind(proportion_immune$prop_immune, proportion_immune$time, .) %>% as.data.frame() 
 
 #name columns
-colnames(Re_df) = c("Se", "time", as.character(R0_wt_vec))
+colnames(Re_df) = c("frac_immune", "time", as.character(R0_wt_vec))
+
+# add se column
+Re_df = Re_df %>% 
+  mutate("Se" = S0*(1-c*frac_immune)) 
 
 #longform
 Re_df = Re_df %>% pivot_longer(
-  cols = !c(Se,time),
+  cols = !c(frac_immune, Se, time),
   names_to = "R0_wt", 
   values_to = "Re_spill"
 )
@@ -633,146 +636,124 @@ plot1 = plot1 + geom_segment(data = Re_df %>% filter(R0_wt == i, time %% 10 == 0
             aes(x = Re_spill, y = Se, xend = c(tail(Re_spill, n = -1),NA), yend = c(tail(Se, n = -1),NA),  colour = factor(R0_wt)), 
             arrow = arrow(length = unit(0.3,"cm")),
             linewidth = 1.25) +
-   geom_text(data = trajectories.singleS0 %>% filter(R0 == i, Year %in% c(2000, 2030, 2080)), aes(x = Re, y = log10(S), label = Year),
+   geom_text(data = Re_df %>% filter(R0_wt == i, time %in% c(10,20,30,50,100)), aes(x = Re_spill, y = Se, label = time),
             nudge_x = -0.01,
             nudge_y = 0.1,
             fontface = "bold",
             size = 5) +
   scale_color_manual(values = c("azure1", "azure2", "azure3", "azure4"))
 }
+
+# at which se is re_evolved > 1 
+Se_critical = S0*(1-(2/3))
+
+#add this horizontal line 
+plot1 = plot1 + geom_hline(yintercept = Se_critical, linetype = "dashed")
+
 #print to view
 print(plot1)
 
 ```
 
-```{r }
-# defining transmission and spillover parms
-R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
-R0_evolved = 3
-S0 = 10^3
-Frac_immune_vec = seq(0, 1, by = 0.01)
+Instead of trying to explain this all, lets start our calculations where the $Frac_{immune}$ is sufficiently high such that the $R_{e,evolved} > 1$. I can remove the condition that $R_{e,spill} < R_{e,evolved}$ because that will be true for every $R_{e,evolved} > 1$.  
 
+```{r fig-5A}
 #defining pathogen parms
 c = 0.8 
 mu = 10^-3
 sigma = 0.1 
 
-# Calculate Se and Re, Evolved for each Frac_Immune
-Se_vec = S0*(1-c*Frac_immune_vec) 
-Re_evolved_vec = R0_evolved*(1-c*Frac_immune_vec)
+#transmission and spillover parms
+R0_evolved = 3
+S0 = 10^3
+max_frac = (1/c)*(1-(1/R0_evolved)) # frac immune where the Re,evolved > 1 and can be sustained in the population after fully evolved
+Frac_immune_vec = seq(0.0, max_frac-0.01, by = 0.01) # do not want to include the max frac
+Re_spill_vec = seq(0.5, 1.05, by = 0.01)
 
-# save as df
-parms_df = data.frame("Frac_immune" = Frac_immune_vec, 
-                      "Se" = Se_vec,
-                      "Re_evolved" = Re_evolved_vec)
+# heatmap 
+df = sapply(Frac_immune_vec, function(Frac_immune){
+  sapply(Re_spill_vec, function(Re_spill){
+     Se = S0*(1-c*Frac_immune) #calculate Se
+     Re_evolved = R0_evolved*(1-c*Frac_immune) #calculate Re
+       
+          Pe = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved) #calculate probability of emergence per introduction
+          Pp = total_P(p = Pe, S = Se, years = 1) #in one year
+    return(Pp)
+  })
+}) %>% cbind(Re_spill_vec, .) %>% as.data.frame()
 
-# Iterate through R0 wildtype to calculate Pp
-df_long = lapply(R0_wt_vec, function(R0_wt){
-  # calculate corresponding Re spillover 
-  df = parms_df %>%
-    mutate(Re_spill = R0_wt*(1-c*Frac_immune))
-  # calculate Pp 
-  df = df %>% 
-    rowwise() %>%
-    mutate(Pe = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)) %>%
-    mutate(Pp = 1-(1-Pe)^Se)
-  # add R0 tag
-  df = df %>% 
-    mutate(R0_wt = R0_wt)
-}) %>% do.call(rbind,.) %>% as.data.frame() # combine all dfs into a single, long form df wrt R0_wt
+#name columns for plotting
+colnames(df) = c("Re_spill", as.character(S0*(1-c*Frac_immune_vec))) # colnames correspond to Se at that frac immune
 
-# plot
-plot = ggplot(df_long, aes(x = Re_spill, y = Se, fill = log10(Pp))) +
-  geom_tile() +
+#convert to longform 
+df_long = df %>% pivot_longer(
+  cols = !c("Re_spill"), 
+  names_to = "Se",
+  values_to = "Pp"
+  
+)
+
+## plot
+plot1 = ggplot() +
+  geom_tile(data = df_long, aes(x = Re_spill, y = as.numeric(Se), fill = log10(Pp))) +
   scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
   labs(x = expression("R"[e] ~ " of Spillover"),
-       y = expression("s"[e] ~ "of Spillover"),
+       y = bquote(atop("s"[e] ~ "of Spillover", "Over Time Post-Eradication")),
        fill = expression("log"[10] ~ "P"[p])) +
+  coord_cartesian(xlim = c(0.5, 1)) +
+  scale_y_continuous(expand = c(0,10), limits = c(S0*(1-c*max_frac), 1000), breaks = c(400,500,600,700,800,900,1000)) +
+  scale_x_continuous(expand = c(0,0)) +
   theme_bw() +
   theme(axis.text = element_text(size = 25),
         axis.title = element_text(size = 25),
         legend.title = element_text(size = 25),
         legend.text = element_text(size = 25))
 
+### add trajectories
+# defining transmission and spillover parms
+R0_wt_vec = c(0.75, 0.85, 0.95, 1.05) # plotting 4 trajectories
+
+Re_df = sapply(R0_wt_vec, function(R0_wt){
+  sapply(proportion_immune$prop_immune, function(frac_immune){
+    Re_spill = R0_wt*(1-c*frac_immune)
+  }) 
+}) %>% cbind(proportion_immune$prop_immune, proportion_immune$time, .) %>% as.data.frame() 
+
+#name columns
+colnames(Re_df) = c("frac_immune", "time", as.character(R0_wt_vec))
+
+# add se column
+Re_df = Re_df %>% 
+  mutate("Se" = S0*(1-c*frac_immune)) 
+
+#longform
+Re_df = Re_df %>% pivot_longer(
+  cols = !c(frac_immune, Se, time),
+  names_to = "R0_wt", 
+  values_to = "Re_spill"
+)
+
+for(i in R0_wt_vec){
+plot1 = plot1 + geom_segment(data = Re_df %>% filter(R0_wt == i, time %% 10 == 0),
+            aes(x = Re_spill, y = Se, xend = c(tail(Re_spill, n = -1),NA), yend = c(tail(Se, n = -1),NA),  colour = factor(R0_wt)), 
+            arrow = arrow(length = unit(0.3,"cm")),
+            linewidth = 1.25) +
+   geom_text(data = Re_df %>% filter(R0_wt == i, time %in% c(10,20,30,50,100)), aes(x = Re_spill, y = Se, label = time),
+            nudge_x = 0.01,
+            nudge_y = -10,
+            fontface = "bold",
+            size = 5) +
+  labs(col = expression(R[0] ~ "of spillover")) +
+  scale_color_manual(values = c("azure1", "azure2", "azure3", "azure4"))
+}
+
 #print to view
-print(plot)
-
-```
-
-
-
-```{r Pp-waning-immunity}
-# define vector of R0 and Frac Immune
-R0_wt_vec = seq(0.75, 1.05, by = 0.001)
-Frac_immune_vec = seq(0, 0.5, by = 0.01)
-
-# define unchanging parms
-sigma = 0.1 # proportional increase in fitness with mutation
-mu = 10^-3 # rate of beneficial mutations per infection
-c = 0.8 #cross-reactivity
-R0_evolved = 3 # max R0 evolvable
-S0 = 10^3
-
-# calculate
-plot.df = sapply(R0_wt_vec, function(R0_wt){
-  sapply(Frac_immune_vec, function(Frac_immune){
-    # calculate R_spill and R_final
-    Re_spill = R0_wt*(1-c*Frac_immune) 
-    Re_evolved = R0_evolved*(1-c*Frac_immune)
-    Se_spill = S0*(1-c*Frac_immune)
-    
-    #calculate p per spill 
-    PE = pEmergence(sigma = sigma, mu = mu, Re_spill = Re_spill, Re_evolved = Re_evolved)
-    
-    # Caluclate probability of emergence per year
-    return(1-(1-PE)^Se_spill) #run simulation for each R0, Immunity combination
-  })
-})
-
-
-# greate long form grid
-plot_long <- expand.grid(FracImmune = Frac_immune_vec,
-                         R0 = R0_wt_vec) %>%
-  mutate(Pp = as.vector(log10(plot.df)))
-
-# Build arrow segments from proportion_immune
-times_to_plot = c(25,50,75,100)
-arrow_df <- proportion_immune %>%
-  filter(time %in% times_to_plot) %>%
-  mutate(x0 = lag(prop_immune, 1),
-         x1 = prop_immune,
-         y = 0.90) %>%
-  filter(!is.na(x0))
-
-plot = ggplot() +
-  geom_tile(data = plot_long, aes(x = FracImmune, y = R0, fill = ifelse(Pp < -11.5, NA, Pp ))) +
-  scale_fill_gradient2(low = ("blue"), mid = "white", high = ("red"), midpoint = -5, limits = c(-10, 0), na.value = "lightgrey") +
-      geom_contour(data = plot_long, aes(x = FracImmune, y = R0, z = Pp), breaks = c(-3), col = 'black', linewidth = 1.5, linetype = "dashed") + 
-  geom_segment(data = arrow_df,
-               aes(x = x0, xend = x1, y = y, yend = y),
-               arrow = arrow(length = unit(0.1, "inches")),
-               linewidth = 1, inherit.aes = FALSE) +
-  annotate("text", x = proportion_immune %>%
-  filter(time %in% times_to_plot) %>% pull(prop_immune), y = c(0.905, 0.88, 0.905, 0.88), label = times_to_plot,
-           hjust = 1, vjust = 0, size = 8, fontface = "bold") +
-  labs(x = "Fraction Immune",
-       y = expression("R"[0] ~ "of Spillover"),
-       fill = expression("P"[P])) +
-  scale_x_reverse(expand = c(0.005,0)) +
-  scale_y_continuous(expand = c(0.001,0)) +
-  coord_cartesian(xlim = c(0.4,0)) +
-  theme_bw() +
-  theme(axis.text = element_text(size = 22),
-        axis.title = element_text(size = 25),
-        legend.title = element_text(size = 25),
-        legend.text = element_text(size = 22))
-
-# print to viewer
-print(plot)
+print(plot1)
 
 #save 
 file = here("results", "paper figs", "fig_pandemic_potential_waning.jpg")
 ggsave(filename = file, plot = plot)
+
 ```
 
 and show how linear changes in $S$ do not have as great an effect on $P_P$: 
@@ -853,7 +834,7 @@ ggsave(filename = file, plot = plot)
 
 Finally, we might want to see these dynamics as a function of time post vaccination: 
 
-```{r plot-Pp-over-time}
+```{r fig-5B}
 # define parms 
 c = 0.8 # cross reactivity of eradicated disease with zoonotic disease
 R0_evolved = 3 # R0 of most evolved variant - perhaps the R0 of the eradicated disease
