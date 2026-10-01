@@ -1,5 +1,5 @@
 # disease-emergence
-This repository contains all the necessary code and model development to conduct the analyses presented in Hirst et al, 2026. (enter citation)
+This repository contains all the necessary code and model development to conduct the analyses presented in Hirst et al, 2026. 
 
 Code for analysing DRC data and generating manuscript figures are found in `disease-emergence/code`.
 Demographic data on age structure in the DRC is saved to `disease-emergence/data`.

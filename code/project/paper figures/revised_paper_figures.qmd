@@ -1,6 +1,6 @@
 ---
 title: "Manuscript Figures"
-subtitle: "Preventing Disease Emergence Following Eradication: Application to Mpox"
+subtitle: "Preventing Disease Emergence Following Eradication"
 format: html
 ---
 
